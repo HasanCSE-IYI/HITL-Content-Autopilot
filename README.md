@@ -51,8 +51,14 @@ Key settings:
 - `WORDPRESS_URL`, `WORDPRESS_USERNAME`, `WORDPRESS_APP_PASSWORD`: For 1-click publishing.
 
 ### 3. Launch the Dashboard
+Run with Python:
 ```powershell
-streamlit run app.py
+python -m streamlit run app.py
+```
+Or simply run the helper script:
+```powershell
+.\run.ps1
+# or double-click run.bat
 ```
 Open your browser at `http://localhost:8501`.
 

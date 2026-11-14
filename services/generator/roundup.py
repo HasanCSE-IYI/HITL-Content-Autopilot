@@ -10,6 +10,7 @@ from services.generator.schema import (
     combine_schemas_to_html
 )
 from services.compliance.rules import inject_compliance_markdown, enforce_nofollow_sponsored
+from services.compliance.quality_checker import audit_article_quality
 
 def generate_roundup_article(
     keyword: str,

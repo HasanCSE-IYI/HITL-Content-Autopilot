@@ -50,3 +50,29 @@ def test_database_crud():
     deleted = delete_draft(draft.id)
     assert deleted is True
     assert get_draft(draft.id) is None
+
+def test_settings_and_presets_persistence():
+    from core.database import (
+        set_setting,
+        get_setting,
+        save_asin_preset,
+        get_asin_presets,
+        delete_asin_preset
+    )
+    # Setting test
+    set_setting("TEST_KEY", "TEST_VAL_123")
+    assert get_setting("TEST_KEY") == "TEST_VAL_123"
+    assert get_setting("NON_EXISTENT", "default") == "default"
+
+    # Presets test
+    save_asin_preset("Headphones", "B01\nB02", "best headphones")
+    presets = get_asin_presets()
+    assert len(presets) >= 1
+    target = next((p for p in presets if p["name"] == "Headphones"), None)
+    assert target is not None
+    assert "B01" in target["asins"]
+    assert target["keyword"] == "best headphones"
+    
+    # Delete preset
+    delete_asin_preset(target["id"])
+

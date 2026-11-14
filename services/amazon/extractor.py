@@ -1,5 +1,6 @@
+import re
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from core.models import AmazonProduct
 from core.config import settings
 from services.amazon.parser import extract_asin, build_affiliate_url
@@ -19,22 +20,101 @@ DEFAULT_BADGES = [
     "Best for Beginners"
 ]
 
+def parse_manual_product_block(block: str, affiliate_tag: str, country: str = "com", index: int = 1) -> AmazonProduct:
+    """
+    Parses a user-written product fact block into an AmazonProduct object.
+    Supports key-value formats (e.g. Title: ..., Price: ..., Specs: ..., Pros: ..., Link: ...)
+    or simple bullet lines.
+    """
+    lines = [line.strip() for line in block.splitlines() if line.strip()]
+    title = f"Product #{index}"
+    price = "Check Price on Amazon"
+    features = []
+    pros = []
+    cons = []
+    asin = f"MANUAL{index:03d}"
+    affiliate_url = ""
+
+    for line in lines:
+        lower = line.lower()
+        if lower.startswith("product:") or lower.startswith("title:") or lower.startswith("name:"):
+            title = line.split(":", 1)[1].strip()
+        elif lower.startswith("price:"):
+            price = line.split(":", 1)[1].strip()
+        elif lower.startswith("specs:") or lower.startswith("features:"):
+            raw_specs = line.split(":", 1)[1].strip()
+            features.extend([s.strip() for s in re.split(r"[,;|]", raw_specs) if s.strip()])
+        elif lower.startswith("pros:") or lower.startswith("advantages:"):
+            raw_pros = line.split(":", 1)[1].strip()
+            pros.extend([p.strip() for p in re.split(r"[,;|]", raw_pros) if p.strip()])
+        elif lower.startswith("cons:") or lower.startswith("drawbacks:"):
+            raw_cons = line.split(":", 1)[1].strip()
+            cons.extend([c.strip() for c in re.split(r"[,;|]", raw_cons) if c.strip()])
+        elif lower.startswith("link:") or lower.startswith("url:"):
+            raw_url = line.split(":", 1)[1].strip()
+            extracted = extract_asin(raw_url)
+            if extracted:
+                asin = extracted
+                affiliate_url = build_affiliate_url(extracted, affiliate_tag, country)
+            else:
+                affiliate_url = raw_url
+        elif lower.startswith("asin:"):
+            raw_asin = line.split(":", 1)[1].strip().upper()
+            if len(raw_asin) == 10:
+                asin = raw_asin
+                affiliate_url = build_affiliate_url(asin, affiliate_tag, country)
+        elif not title or title.startswith("Product #"):
+            # First non-empty line without key could be title
+            title = line
+
+    if not affiliate_url:
+        affiliate_url = build_affiliate_url(asin, affiliate_tag, country)
+
+    return AmazonProduct(
+        asin=asin,
+        title=title,
+        price=price,
+        features=features[:8] if features else [title],
+        pros=pros if pros else features[:3],
+        cons=cons if cons else ["Availability may vary"],
+        affiliate_url=affiliate_url,
+        badge=DEFAULT_BADGES[(index - 1) % len(DEFAULT_BADGES)],
+        provenance=f"Manual Fact Entry ({datetime_stamp()})"
+    )
+
+def datetime_stamp() -> str:
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d")
+
 def fetch_products_hybrid(
     inputs: List[str],
     affiliate_tag: Optional[str] = None,
-    country: Optional[str] = None
+    country: Optional[str] = None,
+    manual_facts_text: Optional[str] = None
 ) -> List[AmazonProduct]:
     """
     Hybrid product fetcher:
-    1. Extracts ASINs from URLs or strings.
-    2. Tries Amazon PA-API 5.0 if configured.
-    3. Seamlessly falls back to Smart Scraper for missing or all items.
-    4. Automatically assigns comparison badges.
+    1. If manual_facts_text is provided, parses manual product blocks.
+    2. Otherwise extracts ASINs from inputs.
+    3. Tries Amazon PA-API 5.0 if credentials configured in Settings.
+    4. Falls back to Smart Scraper for missing items.
     """
     tag = affiliate_tag or settings.AMAZON_ASSOCIATE_TAG
     loc = country or settings.AMAZON_COUNTRY
 
-    # 1. Extract valid ASINs
+    # 1. Check for manual facts blocks
+    if manual_facts_text and manual_facts_text.strip():
+        # Blocks separated by double newline or '---'
+        raw_blocks = re.split(r"\n\s*\n|---+", manual_facts_text.strip())
+        manual_products = []
+        for idx, block in enumerate(raw_blocks):
+            if block.strip():
+                prod = parse_manual_product_block(block.strip(), affiliate_tag=tag, country=loc, index=idx+1)
+                manual_products.append(prod)
+        if manual_products:
+            return manual_products
+
+    # 2. Extract valid ASINs from inputs
     asins = []
     for item in inputs:
         parsed = extract_asin(item)
@@ -47,7 +127,7 @@ def fetch_products_hybrid(
 
     products_map = {}
 
-    # 2. Try PA-API if credentials available
+    # 3. Try PA-API if credentials available
     if settings.AMAZON_ACCESS_KEY and settings.AMAZON_SECRET_KEY:
         try:
             logger.info(f"Attempting PA-API 5.0 fetch for {len(asins)} items...")
@@ -59,18 +139,20 @@ def fetch_products_hybrid(
             )
             paapi_results = client.get_items(asins)
             for p in paapi_results:
+                p.provenance = f"Amazon PA-API 5.0 ({datetime_stamp()})"
                 products_map[p.asin] = p
         except Exception as e:
             logger.warning(f"PA-API attempt failed: {e}. Falling back to scraper.")
 
-    # 3. For any missing ASINs, scrape
+    # 4. For any missing ASINs, scrape
     for asin in asins:
         if asin not in products_map:
             logger.info(f"Scraping product data for ASIN {asin}...")
             product = scrape_amazon_product(asin, affiliate_tag=tag, country=loc)
+            product.provenance = f"Amazon Smart Scraper ({datetime_stamp()})"
             products_map[asin] = product
 
-    # 4. Preserve original order and assign badges
+    # 5. Preserve original order and assign badges
     ordered_products = []
     for idx, asin in enumerate(asins):
         if asin in products_map:
