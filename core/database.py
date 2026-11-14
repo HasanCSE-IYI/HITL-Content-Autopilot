@@ -147,6 +147,16 @@ def init_db():
                 updated_at TEXT NOT NULL
             )
         """)
+
+        # 6. Scraped Products 24-Hour Cache table (Anti-block & Rate reduction)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS scraped_products_cache (
+                asin TEXT PRIMARY KEY,
+                country TEXT NOT NULL,
+                product_json TEXT NOT NULL,
+                cached_at TEXT NOT NULL
+            )
+        """)
     conn.close()
 
 init_db()
@@ -185,6 +195,45 @@ def get_all_settings() -> Dict[str, str]:
     rows = cursor.fetchall()
     conn.close()
     return {r["key"]: r["value"] for r in rows}
+
+# ==========================================
+# Scraped Products Cache Operations
+# ==========================================
+
+def get_cached_product(asin: str, country: str = "com", max_age_hours: int = 24) -> Optional[AmazonProduct]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT product_json, cached_at FROM scraped_products_cache
+        WHERE asin = ? AND country = ?
+    """, (asin.upper(), country.lower()))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        try:
+            cached_time = datetime.fromisoformat(row["cached_at"])
+            age = (datetime.now() - cached_time).total_seconds() / 3600.0
+            if age <= max_age_hours:
+                data = json.loads(row["product_json"])
+                return AmazonProduct(**data)
+        except Exception as e:
+            logger.warning(f"Error reading cached product {asin}: {e}")
+    return None
+
+def cache_product(product: AmazonProduct, country: str = "com") -> None:
+    conn = get_connection()
+    now = datetime.now().isoformat()
+    product_json = json.dumps(product.model_dump())
+    with conn:
+        conn.execute("""
+            INSERT INTO scraped_products_cache (asin, country, product_json, cached_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(asin) DO UPDATE SET
+                country = excluded.country,
+                product_json = excluded.product_json,
+                cached_at = excluded.cached_at
+        """, (product.asin.upper(), country.lower(), product_json, now))
+    conn.close()
 
 # ==========================================
 # ASIN Presets Operations
@@ -380,6 +429,11 @@ def create_bulk_task(task: BulkTask) -> BulkTask:
     conn.close()
     return task
 
+def save_bulk_tasks(tasks: List[BulkTask]) -> List[BulkTask]:
+    for t in tasks:
+        create_bulk_task(t)
+    return tasks
+
 def update_bulk_task(
     task_id: str,
     status: Optional[str] = None,
@@ -402,6 +456,8 @@ def update_bulk_task(
         updated = cursor.rowcount > 0
     conn.close()
     return updated
+
+update_bulk_task_status = update_bulk_task
 
 def get_bulk_task(task_id: str) -> Optional[BulkTask]:
     conn = get_connection()
@@ -483,12 +539,13 @@ def _row_to_draft(row: sqlite3.Row) -> ArticleDraft:
         quality_scorecard=scorecard
     )
 
-def save_draft(draft: ArticleDraft) -> ArticleDraft:
+def save_draft(draft: ArticleDraft, update_timestamp: bool = True) -> ArticleDraft:
     conn = get_connection()
     products_json = json.dumps([p.model_dump() for p in draft.products])
     scorecard_json = json.dumps(draft.quality_scorecard.model_dump()) if draft.quality_scorecard else None
     tags_json = json.dumps(draft.selected_tags)
-    draft.updated_at = datetime.now().isoformat()
+    if update_timestamp:
+        draft.updated_at = datetime.now().isoformat()
     with conn:
         conn.execute("""
             INSERT INTO drafts (

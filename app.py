@@ -3,10 +3,12 @@ from core.config import settings
 from core.database import list_drafts, list_wordpress_sites
 from core.models import ArticleStatus
 from services.generator.gemini_client import SUPPORTED_GEMINI_MODELS
+from ui.tab_keyword_research import render_keyword_research_tab
 from ui.tab_single_workflow import render_single_workflow_tab
 from ui.tab_bulk_queue import render_bulk_queue_tab
 from ui.tab_review import render_review_tab
 from ui.tab_multisite import render_multisite_tab
+from ui.tab_monitor import render_monitor_tab
 from ui.tab_settings import render_settings_tab
 
 st.set_page_config(
@@ -38,14 +40,14 @@ st.markdown("""
         text-align: center;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 20px;
+        gap: 16px;
         margin-bottom: 24px;
     }
     .stTabs [data-baseweb="tab"] {
         height: 52px;
         white-space: pre-wrap;
         font-weight: 600;
-        font-size: 1.02rem;
+        font-size: 0.98rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -81,9 +83,9 @@ with st.sidebar:
     st.markdown(f"**Marketplace:** `amazon.{settings.AMAZON_COUNTRY}`")
 
 # Main Title & Description
-st.markdown('<div class="main-header">🛒 HITL Content Autopilot</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🛒 HITL Content Autopilot v2</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="sub-header">Local-First Amazon Affiliate Content Engine with Multi-Site WordPress Sync, Bulk Queue, and Quality Audits</div>',
+    '<div class="sub-header">Local-First Amazon Affiliate Content Engine with Keyword Intent Analysis, Safe Anti-Block Sourcing, Multi-Site WordPress Sync, Bulk Queue, and Quality Audits</div>',
     unsafe_allow_html=True
 )
 
@@ -104,14 +106,27 @@ m5.metric("🟣 Published", published)
 
 st.markdown("---")
 
-# Navigation Tabs
-tab_single, tab_bulk, tab_rev, tab_sites, tab_set = st.tabs([
-    "🚀 1. Single Workflow",
-    "⚡ 2. Bulk Queue (20–50 KWs)",
-    f"📝 3. HITL Review Queue ({needs_review})",
-    f"🌐 4. Multi-Site WordPress ({len(sites)})",
-    "⚙️ 5. Settings & Config"
+# Navigation Tabs (7 Structured Tabs)
+(
+    tab_kw,
+    tab_single,
+    tab_bulk,
+    tab_rev,
+    tab_sites,
+    tab_mon,
+    tab_set
+) = st.tabs([
+    "🔍 1. Keyword Intent Explorer",
+    "🚀 2. Single Workflow",
+    "⚡ 3. Bulk Queue (20–50 KWs)",
+    f"📝 4. HITL Review Studio ({needs_review})",
+    f"🌐 5. Multi-Site WordPress ({len(sites)})",
+    "📈 6. Monitor & Freshness Alerts",
+    "⚙️ 7. Settings, Proxies & Credentials"
 ])
+
+with tab_kw:
+    render_keyword_research_tab()
 
 with tab_single:
     render_single_workflow_tab()
@@ -125,11 +140,14 @@ with tab_rev:
 with tab_sites:
     render_multisite_tab()
 
+with tab_mon:
+    render_monitor_tab()
+
 with tab_set:
     render_settings_tab()
 
 # Footer
 st.markdown("---")
 st.caption(
-    "🛡️ Enterprise Policy Guard: FTC Disclosures, rel='nofollow sponsored' validation, source traceability & local-first SQLite persistence."
+    "🛡️ Enterprise Policy Guard: FTC Disclosures, rel='nofollow sponsored' link tagging, authorized Amazon product asset policy & local-first SQLite persistence."
 )

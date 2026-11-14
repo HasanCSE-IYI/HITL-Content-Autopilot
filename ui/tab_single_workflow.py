@@ -12,6 +12,8 @@ from core.database import (
     get_wordpress_site
 )
 from services.amazon.extractor import fetch_products_hybrid
+from services.research.product_scorer import score_product, ProductScore
+from services.media.image_policy import validate_product_image_policy
 from services.generator.roundup import generate_roundup_article
 from services.generator.review import generate_single_review_article
 from services.generator.comparison import generate_comparison_article
@@ -38,7 +40,7 @@ Link: https://www.amazon.com/dp/B09V3HN1KC"""
 
 def render_single_workflow_tab():
     st.subheader("🚀 Single Keyword Research & Generation Workflow")
-    st.caption("End-to-end workflow: Keyword $\rightarrow$ Product Sourcing (Scraper / PA-API / Manual Facts) $\rightarrow$ SEO Drafting $\rightarrow$ AI Taxonomy Recommendation.")
+    st.caption("End-to-end workflow: Keyword $\rightarrow$ Product Sourcing & Scoring $\rightarrow$ SEO Drafting $\rightarrow$ AI Taxonomy Recommendation.")
 
     # 1. API Key Quick Check & Banner
     current_key = settings.get_gemini_api_key() or st.session_state.get("gemini_api_key", "")
@@ -65,8 +67,18 @@ def render_single_workflow_tab():
         st.markdown("---")
 
     sites = list_wordpress_sites()
-    saved_default_kw = get_setting("LAST_KEYWORD", "Best Wireless Mechanical Keyboards")
+    
+    # Check if keyword pushed from Keyword Research Explorer
+    pushed_kw = st.session_state.get("workflow_seed_keyword")
+    pushed_angle = st.session_state.get("workflow_editorial_angle")
+    pushed_focus = st.session_state.get("workflow_editorial_focus")
+    pushed_format = st.session_state.get("workflow_article_type")
+
+    saved_default_kw = pushed_kw or get_setting("LAST_KEYWORD", "Best Wireless Mechanical Keyboards")
     saved_default_asins = get_setting("LAST_ASINS", SAMPLE_ASINS)
+
+    if pushed_angle:
+        st.info(f"🎯 **Applied Editorial Angle:** **{pushed_angle}** — Focus: *{pushed_focus}*")
 
     col1, col2 = st.columns([2, 1])
 
@@ -78,6 +90,12 @@ def render_single_workflow_tab():
             help="The primary search term you want this article to rank for."
         )
 
+        format_index = 0
+        if pushed_format == "single_review":
+            format_index = 1
+        elif pushed_format == "comparison":
+            format_index = 2
+
         article_type = st.radio(
             "Article Format",
             options=[
@@ -85,6 +103,7 @@ def render_single_workflow_tab():
                 ("In-Depth Single Product Review", ArticleType.SINGLE_REVIEW),
                 ("Product A vs Product B Comparison", ArticleType.COMPARISON)
             ],
+            index=format_index,
             format_func=lambda x: x[0],
             horizontal=True
         )[1]
@@ -93,7 +112,7 @@ def render_single_workflow_tab():
         sourcing_mode = st.radio(
             "Product Sourcing Method",
             options=[
-                "🛒 Automated Amazon Sourcing (URLs / ASINs via Scraper / PA-API)",
+                "🛒 Automated Amazon Sourcing (URLs / ASINs via Safe Scraper / PA-API)",
                 "📝 Manual Product Facts (Zero API / Zero Network Input)"
             ],
             index=0
@@ -124,7 +143,7 @@ def render_single_workflow_tab():
             asins_input = st.text_area(
                 "Amazon ASINs or Product URLs (One per line)",
                 value=saved_default_asins,
-                height=140,
+                height=130,
                 placeholder="https://www.amazon.com/dp/B08N5WRWNW\nB09V3HN1KC..."
             )
             col_save_asins, col_sample = st.columns([1, 1])
@@ -148,13 +167,21 @@ def render_single_workflow_tab():
             manual_facts_input = st.text_area(
                 "Product Facts (Title, Price, Specs, Pros/Cons, Link)",
                 value=SAMPLE_MANUAL_FACTS,
-                height=220
+                height=180,
+                placeholder="Product: Name\nPrice: $XX\nSpecs: ...\nPros: ...\nCons: ...\nLink: https://..."
             )
             asins_input = ""
 
+        # Score & Preview button before generation
+        col_preview, _ = st.columns([1.5, 1])
+        with col_preview:
+            preview_btn = st.button("🔍 Preview & Score Products (0–100 Audit)", use_container_width=True)
+
     with col2:
-        st.markdown("### 🎯 Publishing Target")
+        st.markdown("### 🌐 Target WordPress Site")
         chosen_site_id = None
+        target_site_obj = None
+
         if sites:
             site_opts = {s.id: f"{s.name} ({s.url})" for s in sites}
             default_idx = next((i for i, s in enumerate(sites) if s.is_default), 0)
@@ -207,6 +234,46 @@ def render_single_workflow_tab():
             key="sw_country_select"
         )
 
+    # Preview & Score execution
+    if preview_btn:
+        with st.spinner("Sourcing and scoring candidate products..."):
+            if manual_facts_input:
+                preview_prods = fetch_products_hybrid([], affiliate_tag=affiliate_tag, country=country, manual_facts_text=manual_facts_input)
+            else:
+                raw_items = [item.strip() for item in asins_input.replace(",", "\n").splitlines() if item.strip()]
+                preview_prods = fetch_products_hybrid(raw_items, affiliate_tag=affiliate_tag, country=country)
+
+            if not preview_prods:
+                st.error("No valid products could be sourced. Please verify your ASINs or manual product facts.")
+            else:
+                st.markdown("#### 📊 Product Transparency & Scoring Audit (0–100)")
+                for p in preview_prods:
+                    score: ProductScore = score_product(p, keyword=keyword)
+                    img_check = validate_product_image_policy(p.main_image or "")
+
+                    score_color = {
+                        "Excellent": "green",
+                        "Good": "blue",
+                        "Fair": "orange",
+                        "Needs Attention": "red"
+                    }.get(score.grade, "gray")
+
+                    with st.expander(f"📦 {p.title[:65]}... — :{score_color}[**Score: {score.total_score}/100 ({score.grade})**]", expanded=True):
+                        sc_col1, sc_col2 = st.columns([2, 1])
+                        with sc_col1:
+                            st.markdown(f"**ASIN:** `{p.asin}` | **Price:** `{p.price}` | **Brand:** `{p.brand or 'N/A'}`")
+                            st.markdown(f"**Verdict:** {score.verdict}")
+                            if score.missing_data:
+                                st.warning("**Missing Data Gaps:**\n- " + "\n- ".join(score.missing_data))
+                            if score.strengths:
+                                st.success("**Strengths Identified:**\n- " + "\n- ".join(score.strengths))
+                        with sc_col2:
+                            st.markdown("**Points Breakdown:**")
+                            for k, v in score.breakdown.items():
+                                st.caption(f"- {k}: **{v} pts**")
+                            st.markdown(f"**Image Compliance:** `{'✅ Authorized' if img_check['is_compliant'] else '⚠️ Flagged'}`")
+                            st.caption(img_check['reason'])
+
     st.markdown("---")
     generate_btn = st.button("✨ Run Autopilot & Generate Draft", type="primary", use_container_width=True, key="sw_run_btn")
 
@@ -222,7 +289,7 @@ def render_single_workflow_tab():
 
         # Sourcing
         with st.status("🤖 Running Content Autopilot Workflow...", expanded=True) as status:
-            st.write("🔍 Sourcing product details (Scraper / PA-API / Manual Facts)...")
+            st.write("🔍 Sourcing product details (Safe Scraper / PA-API / Manual Facts)...")
             if manual_facts_input:
                 products = fetch_products_hybrid([], affiliate_tag=affiliate_tag, country=country, manual_facts_text=manual_facts_input)
             else:
@@ -246,12 +313,19 @@ def render_single_workflow_tab():
             client = GeminiClient(api_key=active_key, model=selected_model)
 
             try:
+                # Include editorial angle in tone if set
+                generation_tone = tone
+                if pushed_angle and pushed_focus:
+                    generation_tone += f". Editorial Focus: {pushed_angle} ({pushed_focus})"
+
                 if article_type == ArticleType.ROUNDUP:
-                    draft = generate_roundup_article(keyword=keyword, products=products, client=client, tone=tone)
+                    draft = generate_roundup_article(keyword=keyword, products=products, client=client, tone=generation_tone)
                 elif article_type == ArticleType.SINGLE_REVIEW:
-                    draft = generate_single_review_article(keyword=keyword, product=products[0], client=client, tone=tone)
+                    draft = generate_single_review_article(keyword=keyword, product=products[0], client=client, tone=generation_tone)
                 else:
-                    draft = generate_comparison_article(keyword=keyword, product_a=products[0], product_b=products[1], client=client)
+                    p1 = products[0]
+                    p2 = products[1] if len(products) > 1 else products[0]
+                    draft = generate_comparison_article(keyword=keyword, product_a=p1, product_b=p2, client=client)
 
                 st.write("🛡️ Injected FTC disclosures, price disclaimer & JSON-LD schema.")
                 
@@ -283,7 +357,7 @@ def render_single_workflow_tab():
                 status.update(label=f"🎉 Successfully generated draft: '{draft.title}'!", state="complete")
                 
                 score_val = draft.quality_scorecard.total_score if draft.quality_scorecard else 95
-                st.success(f"Draft saved! (Quality Score: **{score_val}/100**). Go to the **'HITL Review Queue'** to review, adjust categories, and publish/schedule.")
+                st.success(f"Draft saved! (Quality Score: **{score_val}/100**). Go to the **'HITL Review Studio'** to review, adjust categories, and publish/schedule.")
             except Exception as e:
                 status.update(label=f"❌ Error during generation: {e}", state="error")
                 st.error(f"Generation error: {e}")
