@@ -27,6 +27,7 @@ class QualityScorecard(BaseModel):
     has_schema_markup: bool = True
     has_comparison_table: bool = True
     has_pros_cons: bool = True
+    has_faq: bool = True
     compliant_link_ratio: float = 1.0
     issues: List[str] = Field(default_factory=list)
 

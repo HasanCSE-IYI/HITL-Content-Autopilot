@@ -10,6 +10,7 @@ from services.generator.schema import (
     combine_schemas_to_html
 )
 from services.compliance.rules import inject_compliance_markdown, enforce_nofollow_sponsored
+from services.compliance.quality_checker import audit_article_quality
 
 def generate_single_review_article(
     keyword: str,
@@ -45,7 +46,7 @@ def generate_single_review_article(
         schemas.append(generate_faq_schema(faqs))
     schema_html = combine_schemas_to_html(schemas)
 
-    return ArticleDraft(
+    draft = ArticleDraft(
         title=title,
         slug=slug,
         article_type=ArticleType.SINGLE_REVIEW,
@@ -58,3 +59,5 @@ def generate_single_review_article(
         schema_json_ld=schema_html,
         status=ArticleStatus.NEEDS_REVIEW
     )
+    draft.quality_scorecard = audit_article_quality(draft)
+    return draft

@@ -4,15 +4,15 @@ from core.database import (
     save_asin_preset,
     get_asin_presets,
     delete_asin_preset,
-    get_setting,
-    set_setting
+    list_wordpress_sites,
+    list_drafts
 )
 from services.publisher.wordpress import WordPressPublisher
 from services.generator.gemini_client import GeminiClient, SUPPORTED_GEMINI_MODELS
 
 def render_settings_tab():
     st.subheader("⚙️ System Configuration & Credentials")
-    st.caption("All settings are permanently saved to the local database and persist across reboots.")
+    st.caption("All settings are permanently saved to the local SQLite database and persist across reboots.")
 
     # 1. Gemini AI Settings
     st.markdown("### 🤖 Google Gemini AI Settings")
@@ -72,7 +72,6 @@ def render_settings_tab():
                 res = test_client.test_api_key()
                 if res["success"]:
                     st.success(f"✅ {res['message']}")
-                    # Auto-save verified key
                     settings.save(
                         gemini_api_key=gemini_key.strip(),
                         gemini_model=gemini_model,
@@ -84,23 +83,23 @@ def render_settings_tab():
 
     st.markdown("---")
 
-    # 2. Amazon Associates Settings
-    st.markdown("### 🛒 Amazon Associates Settings")
+    # 2. Amazon Associates & Sourcing Settings
+    st.markdown("### 🛒 Amazon Associates & Sourcing")
     associate_tag = st.text_input(
-        "Amazon Associate Tracking Tag",
+        "Default Amazon Associate Tracking Tag",
         value=settings.AMAZON_ASSOCIATE_TAG,
         help="E.g. myaffiliatesite-20",
         key="settings_amazon_tag_input"
     )
     country = st.selectbox(
-        "Amazon Store Marketplace",
+        "Default Amazon Store Marketplace",
         options=["com", "co.uk", "ca", "de", "fr", "in"],
         index=["com", "co.uk", "ca", "de", "fr", "in"].index(settings.AMAZON_COUNTRY) if settings.AMAZON_COUNTRY in ["com", "co.uk", "ca", "de", "fr", "in"] else 0,
         key="settings_amazon_country_select"
     )
 
-    with st.expander("Optional: Amazon PA-API 5.0 Credentials (if approved)"):
-        st.info("If you do not have PA-API 5.0 keys yet, leave these blank. The built-in Smart Scraper will automatically fetch product details!")
+    with st.expander("🔑 Official Amazon PA-API 5.0 Credentials (Optional)"):
+        st.info("If you do not have PA-API 5.0 keys yet, leave these blank. The built-in Smart Scraper and Manual Facts mode will automatically source product details without API keys!")
         access_key = st.text_input("PA-API Access Key", value=settings.AMAZON_ACCESS_KEY, type="password", key="settings_paapi_access_key")
         secret_key = st.text_input("PA-API Secret Key", value=settings.AMAZON_SECRET_KEY, type="password", key="settings_paapi_secret_key")
 
@@ -111,7 +110,7 @@ def render_settings_tab():
             amazon_access_key=access_key.strip(),
             amazon_secret_key=secret_key.strip()
         )
-        st.success("✅ Amazon Associate Tag & settings permanently saved!")
+        st.success("✅ Amazon settings permanently saved!")
 
     st.markdown("---")
 
@@ -146,32 +145,14 @@ def render_settings_tab():
 
     st.markdown("---")
 
-    # 4. WordPress Settings
-    st.markdown("### 🌐 WordPress REST API Settings")
-    st.caption("Use a WordPress Application Password (Users > Profile > Application Passwords).")
-    wp_url = st.text_input("WordPress Site URL", value=settings.WORDPRESS_URL, placeholder="https://yourwebsite.com", key="settings_wp_url")
-    wp_user = st.text_input("WordPress Username", value=settings.WORDPRESS_USERNAME, key="settings_wp_user")
-    wp_pass = st.text_input("Application Password", value=settings.WORDPRESS_APP_PASSWORD, type="password", key="settings_wp_pass")
+    # 4. Local Database & System Status
+    st.markdown("### 📊 Local-First Database Status")
+    sites_count = len(list_wordpress_sites())
+    drafts_count = len(list_drafts())
+    presets_count = len(existing_presets)
 
-    col_save_wp, col_test_wp = st.columns([1, 1])
-    with col_save_wp:
-        if st.button("💾 Save WordPress Settings", use_container_width=True, type="primary"):
-            settings.save(
-                wordpress_url=wp_url.strip(),
-                wordpress_username=wp_user.strip(),
-                wordpress_app_password=wp_pass.strip()
-            )
-            st.success("✅ WordPress settings permanently saved!")
-
-    with col_test_wp:
-        if st.button("🔌 Test WordPress Connection", use_container_width=True):
-            publisher = WordPressPublisher(
-                wp_url=wp_url.strip(),
-                username=wp_user.strip(),
-                app_password=wp_pass.strip()
-            )
-            result = publisher.test_connection()
-            if result["success"]:
-                st.success(f"✅ {result['message']}")
-            else:
-                st.error(f"❌ {result['message']}")
+    db_c1, db_c2, db_c3 = st.columns(3)
+    db_c1.metric("Connected WP Sites", sites_count)
+    db_c2.metric("Saved Drafts", drafts_count)
+    db_c3.metric("Saved ASIN Presets", presets_count)
+    st.caption("All application data is securely hosted locally in SQLite.")

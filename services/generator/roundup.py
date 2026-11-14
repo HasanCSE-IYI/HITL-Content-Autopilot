@@ -62,4 +62,5 @@ def generate_roundup_article(
         schema_json_ld=schema_html,
         status=ArticleStatus.NEEDS_REVIEW
     )
+    draft.quality_scorecard = audit_article_quality(draft)
     return draft

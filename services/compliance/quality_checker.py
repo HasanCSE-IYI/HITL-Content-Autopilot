@@ -100,6 +100,7 @@ def audit_article_quality(draft: ArticleDraft) -> QualityScorecard:
         has_schema_markup=has_schema,
         has_comparison_table=has_table,
         has_pros_cons=has_pros_cons,
+        has_faq=has_faq,
         compliant_link_ratio=round(link_ratio, 2),
         issues=issues
     )

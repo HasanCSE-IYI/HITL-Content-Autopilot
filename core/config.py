@@ -48,6 +48,8 @@ class Settings:
 
         self.GEMINI_API_KEY = db_gemini_key or os.getenv("GEMINI_API_KEY", "").strip()
         self.GEMINI_MODEL = db_gemini_model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+        if self.GEMINI_MODEL not in ["gemini-3.8-flash", "gemini-3.8-pro", "gemini-3.8-flash-lite"]:
+            self.GEMINI_MODEL = "gemini-3.8-flash"
         self.AMAZON_ASSOCIATE_TAG = db_amazon_tag or os.getenv("AMAZON_ASSOCIATE_TAG", "myaffiliate-20").strip()
         self.AMAZON_COUNTRY = db_amazon_country or os.getenv("AMAZON_COUNTRY", "com").strip()
         self.AMAZON_ACCESS_KEY = db_amazon_access or os.getenv("AMAZON_ACCESS_KEY", "").strip()

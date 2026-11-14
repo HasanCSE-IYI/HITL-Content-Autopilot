@@ -11,15 +11,11 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Supported Gemini Models
+# Supported Gemini Models (Gemini 3.8 and newer only)
 SUPPORTED_GEMINI_MODELS = [
     "gemini-3.8-flash",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
     "gemini-3.8-pro",
-    "gemini-2.5-pro",
-    "gemini-1.5-pro"
+    "gemini-3.8-flash-lite"
 ]
 
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
