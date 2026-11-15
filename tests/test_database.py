@@ -76,3 +76,42 @@ def test_settings_and_presets_persistence():
     # Delete preset
     delete_asin_preset(target["id"])
 
+def test_get_draft_status_counts():
+    from core.database import get_draft_status_counts, save_draft, delete_draft
+    
+    # Initial counts
+    counts_before = get_draft_status_counts()
+    assert isinstance(counts_before, dict)
+    assert "total" in counts_before
+    assert "needs_review" in counts_before
+
+    # Insert test draft
+    draft = ArticleDraft(
+        title="Status Count Test",
+        slug="status-count-test",
+        article_type=ArticleType.ROUNDUP,
+        target_keyword="status test",
+        meta_title="Status Count Test Meta",
+        meta_description="Status Count Test Description",
+        products=[],
+        status=ArticleStatus.NEEDS_REVIEW
+    )
+    save_draft(draft)
+
+    counts_after = get_draft_status_counts()
+    assert counts_after["total"] == counts_before["total"] + 1
+    assert counts_after["needs_review"] == counts_before["needs_review"] + 1
+
+    # Cleanup
+    delete_draft(draft.id)
+    counts_cleaned = get_draft_status_counts()
+    assert counts_cleaned["total"] == counts_before["total"]
+
+def test_ensure_column_validation():
+    from core.database import _ensure_column, get_connection
+    conn = get_connection()
+    with pytest.raises(ValueError, match="Invalid table name identifier"):
+        _ensure_column(conn, "drafts; DROP TABLE drafts;--", "col TEXT")
+    with pytest.raises(ValueError, match="Invalid column name identifier"):
+        _ensure_column(conn, "drafts", "bad-col-name;-- TEXT")
+

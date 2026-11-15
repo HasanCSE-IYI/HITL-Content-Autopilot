@@ -52,3 +52,27 @@ def test_audit_article_quality_detects_missing_elements():
     assert scorecard.compliant_link_ratio < 1.0
     assert scorecard.total_score < 50
     assert len(scorecard.issues) >= 3
+
+def test_audit_article_quality_spaced_table_detection():
+    # Verify standard spaced markdown tables (| --- | --- |) are properly detected
+    draft = ArticleDraft(
+        title="Spaced Table Article",
+        slug="spaced-table",
+        target_keyword="table test",
+        meta_title="Table Test",
+        meta_description="Table Test",
+        content_markdown=(
+            "> **Affiliate Disclosure:** *We earn from Amazon Associates.*\n\n"
+            "| Feature | Product A | Product B |\n"
+            "| :--- | :--- | :--- |\n"
+            "| Price | $100 | $150 |\n\n"
+            "### Pros and Cons\n**Pros:** Good.\n**Cons:** Bad.\n\n"
+            "## Frequently Asked Questions\nQ: FAQ?\n\n"
+            "*Disclaimer: Prices are accurate as of today and subject to change.*"
+        ),
+        content_html='<p><a href="https://amazon.com/dp/B08" rel="nofollow sponsored" target="_blank">Buy</a></p>',
+        schema_json_ld=""
+    )
+    scorecard = audit_article_quality(draft)
+    assert scorecard.has_comparison_table is True
+    assert "Missing quick comparison table." not in scorecard.issues

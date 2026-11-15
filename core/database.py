@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import os
+import re
 import tempfile
 import logging
 from typing import List, Optional, Dict, Any
@@ -40,6 +41,14 @@ def resolve_db_path() -> str:
 
 DB_PATH = resolve_db_path()
 
+def set_database_path(new_path: str):
+    """
+    Sets the active SQLite database path (used by test suites to guarantee database isolation).
+    """
+    global DB_PATH
+    DB_PATH = new_path
+    init_db()
+
 def get_connection():
     global DB_PATH
     try:
@@ -53,7 +62,14 @@ def get_connection():
         return conn
 
 def _ensure_column(conn, table_name: str, column_def: str):
-    col_name = column_def.split()[0]
+    if not re.match(r"^[a-zA-Z0-9_]+$", table_name):
+        raise ValueError(f"Invalid table name identifier: {table_name}")
+    col_parts = column_def.strip().split()
+    if not col_parts:
+        return
+    col_name = col_parts[0]
+    if not re.match(r"^[a-zA-Z0-9_]+$", col_name):
+        raise ValueError(f"Invalid column name identifier: {col_name}")
     cursor = conn.cursor()
     cursor.execute(f"PRAGMA table_info({table_name})")
     cols = [row[1] for row in cursor.fetchall()]
@@ -157,6 +173,35 @@ def init_db():
                 cached_at TEXT NOT NULL
             )
         """)
+
+        # 7. LLM Response Cache table (Token Optimization)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS llm_cache (
+                cache_key TEXT PRIMARY KEY,
+                model TEXT NOT NULL,
+                task_type TEXT NOT NULL,
+                prompt_hash TEXT NOT NULL,
+                response_json TEXT NOT NULL,
+                prompt_tokens INTEGER DEFAULT 0,
+                completion_tokens INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            )
+        """)
+
+        # 8. Token Usage Logs table (Observability & Cost Tracking)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS token_usage_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model TEXT NOT NULL,
+                task_type TEXT NOT NULL,
+                prompt_tokens INTEGER NOT NULL,
+                completion_tokens INTEGER NOT NULL,
+                total_tokens INTEGER NOT NULL,
+                is_cached INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+        """)
     conn.close()
 
 init_db()
@@ -234,6 +279,146 @@ def cache_product(product: AmazonProduct, country: str = "com") -> None:
                 cached_at = excluded.cached_at
         """, (product.asin.upper(), country.lower(), product_json, now))
     conn.close()
+
+# ==========================================
+# LLM Response Cache & Token Usage (Optimization)
+# ==========================================
+
+def get_cached_llm_response(cache_key: str) -> Optional[Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT response_json, expires_at FROM llm_cache
+        WHERE cache_key = ?
+    """, (cache_key,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    try:
+        expires_at = datetime.fromisoformat(row["expires_at"])
+        if datetime.now() > expires_at:
+            conn = get_connection()
+            with conn:
+                conn.execute("DELETE FROM llm_cache WHERE cache_key = ?", (cache_key,))
+            conn.close()
+            return None
+        return json.loads(row["response_json"])
+    except Exception as e:
+        logger.warning(f"Error reading cached LLM response for {cache_key}: {e}")
+        return None
+
+def save_cached_llm_response(
+    cache_key: str,
+    model: str,
+    task_type: str,
+    response_data: Any,
+    prompt_hash: str = "",
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    ttl_hours: int = 48
+) -> None:
+    from datetime import timedelta
+    conn = get_connection()
+    now = datetime.now()
+    expires_at = (now + timedelta(hours=ttl_hours)).isoformat()
+    now_str = now.isoformat()
+    response_json = json.dumps(response_data) if not isinstance(response_data, str) else json.dumps({"raw_text": response_data})
+    with conn:
+        conn.execute("""
+            INSERT INTO llm_cache (
+                cache_key, model, task_type, prompt_hash, response_json,
+                prompt_tokens, completion_tokens, created_at, expires_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(cache_key) DO UPDATE SET
+                response_json = excluded.response_json,
+                prompt_tokens = excluded.prompt_tokens,
+                completion_tokens = excluded.completion_tokens,
+                created_at = excluded.created_at,
+                expires_at = excluded.expires_at
+        """, (cache_key, model, task_type, prompt_hash, response_json, prompt_tokens, completion_tokens, now_str, expires_at))
+    conn.close()
+
+def clear_llm_cache() -> int:
+    conn = get_connection()
+    with conn:
+        cursor = conn.execute("DELETE FROM llm_cache")
+        deleted = cursor.rowcount
+    conn.close()
+    return deleted
+
+def log_token_usage(
+    model: str,
+    task_type: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    is_cached: bool = False
+) -> None:
+    conn = get_connection()
+    now = datetime.now().isoformat()
+    total = prompt_tokens + completion_tokens
+    with conn:
+        conn.execute("""
+            INSERT INTO token_usage_logs (
+                model, task_type, prompt_tokens, completion_tokens, total_tokens, is_cached, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (model, task_type, prompt_tokens, completion_tokens, total, 1 if is_cached else 0, now))
+    conn.close()
+
+def get_token_usage_summary() -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT 
+            SUM(prompt_tokens) as total_prompt,
+            SUM(completion_tokens) as total_completion,
+            SUM(total_tokens) as total_tokens,
+            COUNT(*) as total_requests,
+            SUM(CASE WHEN is_cached = 1 THEN 1 ELSE 0 END) as cache_hits,
+            SUM(CASE WHEN is_cached = 0 THEN 1 ELSE 0 END) as api_calls
+        FROM token_usage_logs
+    """)
+    row = cursor.fetchone()
+    
+    today_prefix = datetime.now().date().isoformat()
+    cursor.execute("""
+        SELECT SUM(total_tokens) as today_tokens
+        FROM token_usage_logs
+        WHERE created_at LIKE ? AND is_cached = 0
+    """, (f"{today_prefix}%",))
+    today_row = cursor.fetchone()
+    
+    cursor.execute("SELECT COUNT(*) as cached_entries FROM llm_cache")
+    cache_row = cursor.fetchone()
+    
+    conn.close()
+
+    total_prompt = (row["total_prompt"] if row and row["total_prompt"] else 0) or 0
+    total_completion = (row["total_completion"] if row and row["total_completion"] else 0) or 0
+    total_tokens = (row["total_tokens"] if row and row["total_tokens"] else 0) or 0
+    cache_hits = (row["cache_hits"] if row and row["cache_hits"] else 0) or 0
+    api_calls = (row["api_calls"] if row and row["api_calls"] else 0) or 0
+    total_requests = (row["total_requests"] if row and row["total_requests"] else 0) or 0
+    today_tokens = (today_row["today_tokens"] if today_row and today_row["today_tokens"] else 0) or 0
+    cached_entries = (cache_row["cached_entries"] if cache_row and cache_row["cached_entries"] else 0) or 0
+
+    estimated_tokens_saved = cache_hits * 2200
+    estimated_cost_saved = round((estimated_tokens_saved / 1000.0) * 0.002, 3)
+
+    return {
+        "total_prompt_tokens": total_prompt,
+        "total_completion_tokens": total_completion,
+        "total_tokens": total_tokens,
+        "today_tokens": today_tokens,
+        "total_requests": total_requests,
+        "api_calls": api_calls,
+        "cache_hits": cache_hits,
+        "cached_entries": cached_entries,
+        "estimated_tokens_saved": estimated_tokens_saved,
+        "estimated_cost_saved_usd": estimated_cost_saved
+    }
 
 # ==========================================
 # ASIN Presets Operations
@@ -327,6 +512,8 @@ def update_wordpress_site(site: WordPressSite) -> bool:
     conn.close()
     return updated
 
+
+
 def delete_wordpress_site(site_id: int) -> bool:
     conn = get_connection()
     with conn:
@@ -375,6 +562,8 @@ def set_default_wordpress_site(site_id: int) -> bool:
     conn.close()
     return updated
 
+
+
 def update_site_taxonomies(site_id: int, categories: List[Dict[str, Any]], tags: List[Dict[str, Any]]) -> bool:
     conn = get_connection()
     now = datetime.now().isoformat()
@@ -389,6 +578,8 @@ def update_site_taxonomies(site_id: int, categories: List[Dict[str, Any]], tags:
         updated = cursor.rowcount > 0
     conn.close()
     return updated
+
+
 
 # ==========================================
 # Bulk Queue Tasks Operations
@@ -456,6 +647,8 @@ def update_bulk_task(
         updated = cursor.rowcount > 0
     conn.close()
     return updated
+
+
 
 update_bulk_task_status = update_bulk_task
 
@@ -621,6 +814,28 @@ def list_drafts(status: Optional[str] = None, wp_site_id: Optional[int] = None) 
     conn.close()
     return [_row_to_draft(r) for r in rows]
 
+def get_draft_status_counts() -> Dict[str, int]:
+    """
+    High-speed status count aggregation directly using SQL GROUP BY.
+    Avoids loading/deserializing draft bodies, markdown, and JSON-LD into memory.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT status, COUNT(*) as cnt FROM drafts GROUP BY status")
+    rows = cursor.fetchall()
+    conn.close()
+
+    counts = {r["status"]: r["cnt"] for r in rows}
+    total = sum(counts.values())
+    return {
+        "total": total,
+        "needs_review": counts.get("needs_review", 0),
+        "approved": counts.get("approved", 0),
+        "scheduled": counts.get("scheduled", 0) + counts.get("future", 0),
+        "published": counts.get("published", 0),
+        "draft": counts.get("draft", 0)
+    }
+
 def delete_draft(draft_id: str) -> bool:
     conn = get_connection()
     with conn:
@@ -651,3 +866,37 @@ def update_draft_status(
         updated = cursor.rowcount > 0
     conn.close()
     return updated
+
+def purge_mock_test_drafts() -> int:
+    """
+    Purges known test / mock drafts accidentally generated by pytest runs.
+    """
+    conn = get_connection()
+    mock_keywords = [
+        "Best Headphones 2026",
+        "Late Spring Roundup",
+        "Outdated 2025 Buying Guide",
+        "Best Laptops in 2026",
+        "widgets",
+        "Test MacBook Air M1"
+    ]
+    query = f"DELETE FROM drafts WHERE title IN ({','.join(['?']*len(mock_keywords))}) OR title LIKE '%Test%'"
+    with conn:
+        cursor = conn.execute(query, tuple(mock_keywords))
+        count = cursor.rowcount
+    conn.close()
+    return count
+
+def purge_all_drafts() -> int:
+    """
+    Purges all drafts from the local database to reset to a pristine clean slate.
+    """
+    conn = get_connection()
+    with conn:
+        cursor = conn.execute("DELETE FROM drafts")
+        count = cursor.rowcount
+    conn.close()
+    return count
+
+
+

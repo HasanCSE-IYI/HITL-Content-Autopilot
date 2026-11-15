@@ -61,6 +61,75 @@ def get_anti_block_headers() -> Dict[str, str]:
         headers["Sec-Ch-Ua-Platform"] = profile["Sec-Ch-Ua-Platform"]
     return headers
 
+def parse_proxy_pool(raw_config: Optional[str] = None) -> List[str]:
+    """
+    Parses a single or multi-line proxy string into a normalized list of proxy URLs.
+    Supports:
+      - ip:port
+      - http://ip:port
+      - http://username:password@ip:port
+      - socks5://...
+    """
+    raw = (raw_config if raw_config is not None else get_setting("AMAZON_SCRAPER_PROXY", "")).strip()
+    if not raw:
+        return []
+    lines = [p.strip() for p in re.split(r"[\n,;]", raw) if p.strip()]
+    normalized = []
+    for line in lines:
+        if not re.match(r"^[a-zA-Z0-9]+://", line):
+            line = f"http://{line}"
+        normalized.append(line)
+    return normalized
+
+def get_active_proxy(raw_config: Optional[str] = None) -> Optional[Dict[str, str]]:
+    """
+    Randomly selects an active proxy from the configured rotating pool.
+    """
+    pool = parse_proxy_pool(raw_config)
+    if not pool:
+        return None
+    selected = random.choice(pool)
+    return {"http": selected, "https": selected}
+
+def check_proxy_connection(proxy_url: str, timeout: int = 10) -> Dict[str, Any]:
+    """
+    Pings an IP check service through the target proxy to verify connectivity,
+    external IP, and response latency.
+    """
+    clean_proxy = proxy_url.strip()
+    if not clean_proxy:
+        return {"success": False, "message": "Proxy URL is empty."}
+    if not re.match(r"^[a-zA-Z0-9]+://", clean_proxy):
+        clean_proxy = f"http://{clean_proxy}"
+
+    proxies = {"http": clean_proxy, "https": clean_proxy}
+    test_endpoints = [
+        "https://api.ipify.org?format=json",
+        "https://httpbin.org/ip"
+    ]
+    
+    start_time = time.time()
+    for endpoint in test_endpoints:
+        try:
+            resp = requests.get(endpoint, proxies=proxies, timeout=timeout)
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            if resp.status_code == 200:
+                data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+                detected_ip = data.get("ip") or data.get("origin") or "Verified"
+                return {
+                    "success": True,
+                    "ip": detected_ip,
+                    "latency_ms": elapsed_ms,
+                    "proxy": clean_proxy,
+                    "message": f"Proxy connected successfully! Detected external IP: {detected_ip} (Latency: {elapsed_ms}ms)"
+                }
+        except requests.exceptions.Timeout:
+            return {"success": False, "message": f"Connection timed out after {timeout} seconds via {clean_proxy}."}
+        except Exception as e:
+            return {"success": False, "message": f"Proxy connection error: {str(e)}"}
+            
+    return {"success": False, "message": "Failed to connect through proxy endpoints."}
+
 def is_verification_challenge(html_text: str, status_code: int) -> bool:
     """
     Detects if Amazon served an anti-bot verification or captcha challenge.
@@ -121,9 +190,8 @@ def scrape_amazon_product(
     url = f"https://www.amazon.{country}/dp/{clean_asin}"
     headers = get_anti_block_headers()
 
-    # Optional proxy
-    proxy_url = get_setting("AMAZON_SCRAPER_PROXY", "")
-    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+    # Rotating proxy from configured pool
+    proxies = get_active_proxy()
 
     try:
         session = requests.Session()
@@ -202,6 +270,11 @@ def scrape_amazon_product(
                     pass
             if not product.main_image:
                 product.main_image = img_el.get("data-old-hires") or img_el.get("src")
+
+        if product.main_image:
+            product.main_image = product.main_image.strip()
+            if product.main_image.startswith("//"):
+                product.main_image = f"https:{product.main_image}"
 
         if bullets:
             product.pros = bullets[:3]

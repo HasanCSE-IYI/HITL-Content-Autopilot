@@ -19,6 +19,11 @@ from services.generator.review import generate_single_review_article
 from services.generator.comparison import generate_comparison_article
 from services.generator.category_recommender import recommend_category_and_tags
 from services.generator.gemini_client import GeminiClient, SUPPORTED_GEMINI_MODELS
+from services.generator.openai_client import OpenAIClient
+from services.generator.factory import get_llm_client
+from services.media.image_generator import create_article_hero_image
+from services.amazon.csv_importer import generate_product_facts_csv_template, parse_product_facts_csv
+from core.config import SUPPORTED_OPENAI_MODELS, DEFAULT_OPENAI_MODEL
 
 SAMPLE_ASINS = """B0CX23V2ZT
 B09V3HN1KC
@@ -42,24 +47,72 @@ def render_single_workflow_tab():
     st.subheader("🚀 Single Keyword Research & Generation Workflow")
     st.caption("End-to-end workflow: Keyword $\rightarrow$ Product Sourcing & Scoring $\rightarrow$ SEO Drafting $\rightarrow$ AI Taxonomy Recommendation.")
 
-    # 1. API Key Quick Check & Banner
-    current_key = settings.get_gemini_api_key() or st.session_state.get("gemini_api_key", "")
+    st.markdown("""
+    <div style="background: rgba(0,0,0,0.025); border: 1px solid rgba(0,0,0,0.06); border-radius: 14px; padding: 10px 18px; margin-bottom: 22px; display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: #0071e3; color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; box-shadow: 0 2px 6px rgba(0,113,227,0.3);">1</span>
+            <span style="font-weight: 700; font-size: 0.88rem; color: #1d1d1f; letter-spacing: -0.01em;">Topic & Format</span>
+        </div>
+        <span style="color: #cbd5e1; font-weight: bold;">➔</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: rgba(0, 113, 227, 0.1); color: #0071e3; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">2</span>
+            <span style="font-weight: 600; font-size: 0.88rem; color: #64748b; letter-spacing: -0.01em;">Sourcing & 0–100 Audit</span>
+        </div>
+        <span style="color: #cbd5e1; font-weight: bold;">➔</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: rgba(0, 113, 227, 0.1); color: #0071e3; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">3</span>
+            <span style="font-weight: 600; font-size: 0.88rem; color: #64748b; letter-spacing: -0.01em;">AI Drafting & Visuals</span>
+        </div>
+        <span style="color: #cbd5e1; font-weight: bold;">➔</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: rgba(0, 113, 227, 0.1); color: #0071e3; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">4</span>
+            <span style="font-weight: 600; font-size: 0.88rem; color: #64748b; letter-spacing: -0.01em;">HITL Studio Approval</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 1. AI Provider & API Key Quick Check
+    active_provider = settings.get_active_provider()
+    col_prov1, _ = st.columns([1.5, 1])
+    with col_prov1:
+        chosen_provider = st.radio(
+            "AI Engine Provider",
+            options=["gemini", "openai"],
+            format_func=lambda x: "✨ Google Gemini" if x == "gemini" else "🤖 OpenAI",
+            index=0 if active_provider == "gemini" else 1,
+            horizontal=True,
+            key="sw_active_provider_radio"
+        )
+
+    if chosen_provider == "gemini":
+        current_key = getattr(settings, "get_gemini_api_key", lambda: getattr(settings, "GEMINI_API_KEY", ""))() or st.session_state.get("gemini_api_key", "")
+        key_label = "Gemini API Key"
+        key_placeholder = "Paste AIzaSy... key here"
+    else:
+        current_key = getattr(settings, "get_openai_api_key", lambda: getattr(settings, "OPENAI_API_KEY", ""))() or st.session_state.get("openai_api_key", "")
+        key_label = "OpenAI API Key"
+        key_placeholder = "Paste sk-proj-... key here"
+
     if not current_key:
-        st.warning("⚠️ **Gemini API Key Required**")
+        st.warning(f"⚠️ **{chosen_provider.upper()} API Key Required**")
         col_k1, col_k2 = st.columns([3, 1])
         with col_k1:
             quick_key = st.text_input(
-                "Enter Gemini API Key",
+                f"Enter {key_label}",
                 type="password",
-                placeholder="Paste AIzaSy... key here",
-                key="quick_gemini_key_sw",
+                placeholder=key_placeholder,
+                key=f"quick_{chosen_provider}_key_sw",
                 label_visibility="collapsed"
             )
         with col_k2:
-            if st.button("💾 Save Key", use_container_width=True, type="primary", key="save_key_sw"):
+            if st.button("💾 Save Key", use_container_width=True, type="primary", key=f"save_key_{chosen_provider}_sw"):
                 if quick_key.strip():
-                    settings.save(gemini_api_key=quick_key.strip())
-                    st.session_state["gemini_api_key"] = quick_key.strip()
+                    if chosen_provider == "gemini":
+                        settings.save(gemini_api_key=quick_key.strip())
+                        st.session_state["gemini_api_key"] = quick_key.strip()
+                    else:
+                        settings.save(openai_api_key=quick_key.strip())
+                        st.session_state["openai_api_key"] = quick_key.strip()
                     st.success("API Key saved permanently!")
                     st.rerun()
                 else:
@@ -74,8 +127,17 @@ def render_single_workflow_tab():
     pushed_focus = st.session_state.get("workflow_editorial_focus")
     pushed_format = st.session_state.get("workflow_article_type")
 
-    saved_default_kw = pushed_kw or get_setting("LAST_KEYWORD", "Best Wireless Mechanical Keyboards")
-    saved_default_asins = get_setting("LAST_ASINS", SAMPLE_ASINS)
+    # Clean empty-by-default inputs unless pushed from Keyword Research or requested sample
+    persisted_kw = get_setting("LAST_KEYWORD", "")
+    if persisted_kw == "Best Wireless Mechanical Keyboards":
+        persisted_kw = ""
+    saved_default_kw = pushed_kw or persisted_kw
+
+    sample_asins_requested = st.session_state.pop("sw_asins_sample", None)
+    persisted_asins = get_setting("LAST_ASINS", "")
+    if persisted_asins.strip() == SAMPLE_ASINS.strip():
+        persisted_asins = ""
+    saved_default_asins = sample_asins_requested or persisted_asins
 
     if pushed_angle:
         st.info(f"🎯 **Applied Editorial Angle:** **{pushed_angle}** — Focus: *{pushed_focus}*")
@@ -86,7 +148,7 @@ def render_single_workflow_tab():
         keyword = st.text_input(
             "Target Primary Keyword",
             value=saved_default_kw,
-            placeholder="e.g. Best Wireless Mechanical Keyboards",
+            placeholder="e.g. Best Ergonomic Office Chairs, Quiet Air Purifiers",
             help="The primary search term you want this article to rank for."
         )
 
@@ -144,7 +206,7 @@ def render_single_workflow_tab():
                 "Amazon ASINs or Product URLs (One per line)",
                 value=saved_default_asins,
                 height=130,
-                placeholder="https://www.amazon.com/dp/B08N5WRWNW\nB09V3HN1KC..."
+                placeholder="Paste Amazon URLs or ASINs (one per line)...\nExample:\nhttps://www.amazon.com/dp/B08N5WRWNW\nB09V3HN1KC"
             )
             col_save_asins, col_sample = st.columns([1, 1])
             with col_save_asins:
@@ -157,19 +219,60 @@ def render_single_workflow_tab():
                     st.session_state["sw_asins_sample"] = SAMPLE_ASINS
                     st.rerun()
 
-            if "sw_asins_sample" in st.session_state:
-                asins_input = st.session_state.pop("sw_asins_sample")
             manual_facts_input = None
 
         else:
             # Manual facts entry
+            sample_facts_requested = st.session_state.pop("sw_facts_sample", None)
+            persisted_facts = get_setting("LAST_MANUAL_FACTS", "")
+            if persisted_facts.strip() == SAMPLE_MANUAL_FACTS.strip():
+                persisted_facts = ""
+            saved_facts_val = sample_facts_requested or persisted_facts
+
             st.info("ℹ️ Enter product details directly without calling Amazon APIs or scraping. Separate multiple products with a blank line.")
+
+            # CSV Product Importer (Section 4 & 5 Compliance)
+            with st.expander("📂 Import Products from CSV Spreadsheet", expanded=False):
+                st.caption("Upload a CSV file containing your product research (ASIN, Title, Price, Specs, Pros, Cons, URL).")
+                csv_c1, csv_c2 = st.columns([1.5, 1])
+                with csv_c2:
+                    st.download_button(
+                        "📥 Download CSV Template",
+                        data=generate_product_facts_csv_template(),
+                        file_name="amazon_product_sourcing_template.csv",
+                        mime="text/csv",
+                        key="sw_dl_csv_tpl",
+                        use_container_width=True
+                    )
+                with csv_c1:
+                    uploaded_csv = st.file_uploader("Choose CSV File", type=["csv"], key="sw_csv_upload")
+                    if uploaded_csv:
+                        csv_content = uploaded_csv.getvalue().decode("utf-8", errors="ignore")
+                        parsed_prods = parse_product_facts_csv(csv_content, affiliate_tag=affiliate_tag if "affiliate_tag" in locals() else "tag-20")
+                        if parsed_prods:
+                            st.toast(f"✅ Imported {len(parsed_prods)} products from CSV!", icon="📦")
+                            lines_acc = []
+                            for p in parsed_prods:
+                                lines_acc.append(
+                                    f"Product: {p.title}\nPrice: {p.price}\nSpecs: {', '.join(p.features)}\nPros: {', '.join(p.pros)}\nCons: {', '.join(p.cons)}\nLink: {p.affiliate_url}"
+                                )
+                            saved_facts_val = "\n\n".join(lines_acc)
+
             manual_facts_input = st.text_area(
                 "Product Facts (Title, Price, Specs, Pros/Cons, Link)",
-                value=SAMPLE_MANUAL_FACTS,
+                value=saved_facts_val,
                 height=180,
                 placeholder="Product: Name\nPrice: $XX\nSpecs: ...\nPros: ...\nCons: ...\nLink: https://..."
             )
+            col_save_facts, col_sample_facts = st.columns([1, 1])
+            with col_save_facts:
+                if st.button("💾 Save as Default Facts", use_container_width=True, key="save_facts_btn_sw"):
+                    set_setting("LAST_MANUAL_FACTS", manual_facts_input.strip())
+                    st.success("✅ Saved Product Facts as default!")
+            with col_sample_facts:
+                if st.button("📋 Load Sample Product Facts", use_container_width=True, key="sample_facts_btn_sw"):
+                    st.session_state["sw_facts_sample"] = SAMPLE_MANUAL_FACTS
+                    st.rerun()
             asins_input = ""
 
         # Score & Preview button before generation
@@ -201,15 +304,38 @@ def render_single_workflow_tab():
         st.markdown("---")
         st.markdown("### ⚙️ Model & Writing Options")
 
-        curr_model = settings.GEMINI_MODEL
-        model_idx = SUPPORTED_GEMINI_MODELS.index(curr_model) if curr_model in SUPPORTED_GEMINI_MODELS else 0
-        selected_model = st.selectbox(
-            "Gemini Model",
-            options=SUPPORTED_GEMINI_MODELS,
-            index=model_idx,
-            key="sw_model_select"
-        )
+        if chosen_provider == "gemini":
+            selected_model = st.selectbox(
+                "Gemini Model",
+                options=SUPPORTED_GEMINI_MODELS,
+                index=0,
+                key="sw_model_select"
+            )
+        else:
+            selected_model = "gpt-6-luna"
+            st.info("🎯 **Configured Text Model:** `GPT-6 Luna (gpt-6-luna)`")
 
+        # Image Generation Options with Image 2.5 Flare
+        st.markdown("---")
+        st.markdown("### 🎨 Editorial Hero Image (Image 2.5 Flare)")
+        gen_hero = st.checkbox(
+            "Generate Editorial Hero Graphic (Image 2.5 Flare)",
+            value=True,
+            help="Creates an original lifestyle / conceptual hero illustration for the article header (strictly compliant with Amazon image policies)."
+        )
+        hero_quality = "medium"
+        if gen_hero:
+            q_idx = 0 if settings.IMAGE_QUALITY == "low" else 1
+            hero_quality = st.radio(
+                "Image 2.5 Flare Quality Setting",
+                options=["low", "medium"],
+                index=q_idx,
+                format_func=lambda x: "⚡ Low Quality (Faster)" if x == "low" else "✨ Medium Quality (Higher Fidelity)",
+                horizontal=True,
+                key="sw_hero_quality_radio"
+            )
+
+        st.markdown("---")
         tone = st.selectbox(
             "Writing Tone",
             options=[
@@ -251,14 +377,28 @@ def render_single_workflow_tab():
                     score: ProductScore = score_product(p, keyword=keyword)
                     img_check = validate_product_image_policy(p.main_image or "")
 
-                    score_color = {
-                        "Excellent": "green",
-                        "Good": "blue",
-                        "Fair": "orange",
-                        "Needs Attention": "red"
-                    }.get(score.grade, "gray")
+                    grade_badge = {
+                        "Excellent": ("rgba(52, 199, 89, 0.1)", "#15803d", "rgba(52, 199, 89, 0.3)", "🟢 Excellent"),
+                        "Good": ("rgba(0, 113, 227, 0.1)", "#0071e3", "rgba(0, 113, 227, 0.3)", "🔵 Good"),
+                        "Fair": ("rgba(255, 149, 0, 0.1)", "#b45309", "rgba(255, 149, 0, 0.3)", "🟡 Fair"),
+                        "Needs Attention": ("rgba(239, 68, 68, 0.1)", "#b91c1c", "rgba(239, 68, 68, 0.3)", "🔴 Needs Attention")
+                    }.get(score.grade, ("rgba(0,0,0,0.05)", "#64748b", "rgba(0,0,0,0.1)", score.grade))
 
-                    with st.expander(f"📦 {p.title[:65]}... — :{score_color}[**Score: {score.total_score}/100 ({score.grade})**]", expanded=True):
+                    with st.expander(f"📦 {p.title[:60]}... — Score: {score.total_score}/100 ({score.grade})", expanded=True):
+                        st.markdown(f"""
+                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
+                            <span class="apple-pill-badge" style="background: {grade_badge[0]}; color: {grade_badge[1]}; border: 1px solid {grade_badge[2]}; font-size: 0.84rem; padding: 4px 12px;">
+                                {grade_badge[3]} ({score.total_score}/100)
+                            </span>
+                            <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: #0071e3; border: 1px solid rgba(0, 113, 227, 0.2);">
+                                Price: {p.price or 'N/A'}
+                            </span>
+                            <span class="apple-pill-badge" style="background: {'rgba(52, 199, 89, 0.08)' if img_check['is_compliant'] else 'rgba(239, 68, 68, 0.08)'}; color: {'#15803d' if img_check['is_compliant'] else '#b91c1c'}; border: 1px solid {'rgba(52, 199, 89, 0.2)' if img_check['is_compliant'] else 'rgba(239, 68, 68, 0.2)'};">
+                                {'✅ Amazon Asset Compliant' if img_check['is_compliant'] else '⚠️ Asset Flagged'}
+                            </span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
                         sc_col1, sc_col2 = st.columns([2, 1])
                         with sc_col1:
                             st.markdown(f"**ASIN:** `{p.asin}` | **Price:** `{p.price}` | **Brand:** `{p.brand or 'N/A'}`")
@@ -271,16 +411,19 @@ def render_single_workflow_tab():
                             st.markdown("**Points Breakdown:**")
                             for k, v in score.breakdown.items():
                                 st.caption(f"- {k}: **{v} pts**")
-                            st.markdown(f"**Image Compliance:** `{'✅ Authorized' if img_check['is_compliant'] else '⚠️ Flagged'}`")
-                            st.caption(img_check['reason'])
+                            st.caption(f"Image Rule: {img_check['reason']}")
 
     st.markdown("---")
     generate_btn = st.button("✨ Run Autopilot & Generate Draft", type="primary", use_container_width=True, key="sw_run_btn")
 
     if generate_btn:
-        active_key = settings.get_gemini_api_key() or st.session_state.get("gemini_api_key", "")
+        active_key = (
+            getattr(settings, "get_gemini_api_key", lambda: getattr(settings, "GEMINI_API_KEY", ""))() or st.session_state.get("gemini_api_key", "")
+            if chosen_provider == "gemini"
+            else getattr(settings, "get_openai_api_key", lambda: getattr(settings, "OPENAI_API_KEY", ""))() or st.session_state.get("openai_api_key", "")
+        )
         if not active_key:
-            st.error("⚠️ GEMINI_API_KEY is not configured! Please enter your key in the box above.")
+            st.error(f"⚠️ {chosen_provider.upper()}_API_KEY is not configured! Please enter your key in the box above.")
             return
 
         if not keyword.strip():
@@ -309,8 +452,8 @@ def render_single_workflow_tab():
             for p in products:
                 st.write(f"- **{p.title[:60]}...** ({p.price}) [{p.provenance}]")
 
-            st.write(f"✍️ Drafting SEO article with Google {selected_model}...")
-            client = GeminiClient(api_key=active_key, model=selected_model)
+            st.write(f"✍️ Drafting SEO article with {chosen_provider.upper()} ({selected_model})...")
+            client = get_llm_client(provider=chosen_provider, model=selected_model, api_key=active_key)
 
             try:
                 # Include editorial angle in tone if set
@@ -326,6 +469,21 @@ def render_single_workflow_tab():
                     p1 = products[0]
                     p2 = products[1] if len(products) > 1 else products[0]
                     draft = generate_comparison_article(keyword=keyword, product_a=p1, product_b=p2, client=client)
+
+                # Generate Hero Image with Image 2.5 Flare if enabled
+                if gen_hero:
+                    st.write(f"🎨 Generating editorial hero graphic with Image 2.5 Flare ({hero_quality} quality)...")
+                    hero_res = create_article_hero_image(
+                        keyword=keyword,
+                        article_angle=pushed_angle or "",
+                        quality=hero_quality
+                    )
+                    if hero_res.get("success") and hero_res.get("image_url"):
+                        hero_url = hero_res["image_url"]
+                        draft.content_markdown = f"![{keyword} - Editorial Guide]({hero_url})\n\n" + draft.content_markdown
+                        st.write("✅ Created and embedded Image 2.5 Flare hero graphic!")
+                    elif not hero_res.get("success"):
+                        st.caption(f"ℹ️ Image notice: {hero_res.get('message')}")
 
                 st.write("🛡️ Injected FTC disclosures, price disclaimer & JSON-LD schema.")
                 

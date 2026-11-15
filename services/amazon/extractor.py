@@ -6,6 +6,8 @@ from core.config import settings
 from services.amazon.parser import extract_asin, build_affiliate_url
 from services.amazon.scraper import scrape_amazon_product
 from services.amazon.paapi import AmazonPAAPIClient
+from services.amazon.adapter import get_product_discovery_adapter
+from services.amazon.csv_importer import parse_product_facts_csv
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +104,14 @@ def fetch_products_hybrid(
     tag = affiliate_tag or settings.AMAZON_ASSOCIATE_TAG
     loc = country or settings.AMAZON_COUNTRY
 
-    # 1. Check for manual facts blocks
+    # 1. Check for manual facts blocks (or CSV text)
     if manual_facts_text and manual_facts_text.strip():
+        first_line = manual_facts_text.strip().splitlines()[0].lower()
+        if "asin," in first_line or "title," in first_line or "product," in first_line:
+            csv_products = parse_product_facts_csv(manual_facts_text, affiliate_tag=tag, country=loc)
+            if csv_products:
+                return csv_products
+
         # Blocks separated by double newline or '---'
         raw_blocks = re.split(r"\n\s*\n|---+", manual_facts_text.strip())
         manual_products = []

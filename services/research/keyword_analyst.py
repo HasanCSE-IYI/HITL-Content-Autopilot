@@ -2,7 +2,8 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from services.generator.gemini_client import GeminiClient
+from core.config import settings
+from services.generator.factory import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +26,16 @@ class KeywordAnalysisResult(BaseModel):
     recommended_article_type: str = "roundup"
     metrics_note: str = "Search volume and keyword difficulty are not fabricated without a verified SEO API provider."
 
-def analyze_keyword(keyword: str, client: Optional[GeminiClient] = None) -> KeywordAnalysisResult:
+def analyze_keyword(keyword: str, client: Optional[Any] = None) -> KeywordAnalysisResult:
     """
     Expands a seed keyword into search intent, related long-tail queries,
     People Also Ask questions, and 3 differentiated editorial angles.
     Never fabricates fake search volume or difficulty numbers.
     """
     clean_kw = keyword.strip()
-    gemini = client or GeminiClient()
+    llm = client or get_llm_client()
 
-    if not gemini.is_configured():
+    if not llm.is_configured():
         return KeywordAnalysisResult(
             keyword=clean_kw,
             search_intent="Commercial Investigation",
@@ -81,7 +82,12 @@ Return output strictly as JSON matching this format:
 }}
 """
     try:
-        data = gemini.generate_json(prompt, temperature=0.3)
+        data = llm.generate_json(
+            prompt,
+            temperature=0.3,
+            max_tokens=getattr(settings, "MAX_TOKENS_KEYWORD", 900),
+            task_type="keyword_intent"
+        )
         questions = [UserQuestion(**q) for q in data.get("user_questions", [])]
         angles = [EditorialAngle(**a) for a in data.get("editorial_angles", [])]
 

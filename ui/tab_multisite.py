@@ -66,20 +66,30 @@ def render_multisite_tab():
     st.markdown(f"### 📋 Connected WordPress Sites ({len(sites)})")
 
     for site in sites:
-        with st.container():
+        with st.container(border=True):
             col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
             with col1:
-                default_badge = " ⭐ (Default)" if site.is_default else ""
-                st.markdown(f"#### {site.name}{default_badge}")
-                st.caption(f"🔗 `{site.url}` | User: `{site.username}`")
+                default_badge = """ <span class="apple-pill-badge" style="background: rgba(255, 149, 0, 0.1); color: #b45309; border: 1px solid rgba(255, 149, 0, 0.25);">⭐ Primary</span>""" if site.is_default else ""
+                st.markdown(f"""
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="apple-beacon-dot" style="background: #34c759;"></span>
+                    <span style="font-weight: 700; font-size: 1.05rem; color: #1d1d1f;">{site.name}</span>
+                    {default_badge}
+                </div>
+                """, unsafe_allow_html=True)
+                st.caption(f"🔗 `{site.url}` &nbsp;•&nbsp; User: `{site.username}`")
             with col2:
                 cat_count = len(site.categories)
                 tag_count = len(site.tags)
-                st.markdown(f"**Taxonomies:** {cat_count} Cats / {tag_count} Tags")
+                st.markdown(f"""
+                <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: #0071e3; border: 1px solid rgba(0, 113, 227, 0.2);">
+                    Taxonomies: {cat_count} Cats / {tag_count} Tags
+                </span>
+                """, unsafe_allow_html=True)
                 last_sync = site.last_synced_at[:16].replace("T", " ") if site.last_synced_at else "Never"
                 st.caption(f"Last sync: {last_sync}")
             with col3:
-                if st.button("🔄 Sync Taxonomies", key=f"sync_btn_{site.id}", use_container_width=True):
+                if st.button("🔄 Sync Taxonomies", key=f"sync_btn_{site.id}", use_container_width=True, type="secondary"):
                     with st.spinner("Fetching categories and tags from WordPress..."):
                         publisher = WordPressPublisher(site=site)
                         res = publisher.sync_taxonomies(site.id)
@@ -91,11 +101,11 @@ def render_multisite_tab():
             with col4:
                 btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
-                    if not site.is_default and st.button("⭐ Default", key=f"def_btn_{site.id}"):
+                    if not site.is_default and st.button("⭐ Default", key=f"def_btn_{site.id}", use_container_width=True):
                         set_default_wordpress_site(site.id)
                         st.rerun()
                 with btn_col2:
-                    if st.button("🗑️ Delete", key=f"del_site_{site.id}"):
+                    if st.button("🗑️ Delete", key=f"del_site_{site.id}", use_container_width=True):
                         delete_wordpress_site(site.id)
                         st.warning(f"Deleted {site.name}")
                         st.rerun()

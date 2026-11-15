@@ -102,11 +102,26 @@ def render_monitor_tab():
 
         alert_col1, alert_col2, alert_col3 = st.columns(3)
         with alert_col1:
-            st.warning(f"**30–59 Days Old:** {warning_30_count} article(s)")
+            st.markdown(f"""
+            <div style="background: rgba(255, 149, 0, 0.08); border: 1px solid rgba(255, 149, 0, 0.25); border-radius: 12px; padding: 12px 16px; text-align: center;">
+                <div style="font-size: 0.8rem; font-weight: 600; color: #b45309; text-transform: uppercase;">30–59 Days (Approaching)</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #92400e;">{warning_30_count} <span style="font-size: 0.9rem; font-weight: 500;">posts</span></div>
+            </div>
+            """, unsafe_allow_html=True)
         with alert_col2:
-            st.warning(f"**60–89 Days Old:** {warning_60_count} article(s)")
+            st.markdown(f"""
+            <div style="background: rgba(249, 115, 22, 0.08); border: 1px solid rgba(249, 115, 22, 0.25); border-radius: 12px; padding: 12px 16px; text-align: center;">
+                <div style="font-size: 0.8rem; font-weight: 600; color: #c2410c; text-transform: uppercase;">60–89 Days (Review Needed)</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #9a3412;">{warning_60_count} <span style="font-size: 0.9rem; font-weight: 500;">posts</span></div>
+            </div>
+            """, unsafe_allow_html=True)
         with alert_col3:
-            st.error(f"**90+ Days Old:** {critical_90_count} article(s)")
+            st.markdown(f"""
+            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 12px 16px; text-align: center;">
+                <div style="font-size: 0.8rem; font-weight: 600; color: #b91c1c; text-transform: uppercase;">90+ Days (Critical Policy Risk)</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #7f1d1d;">{critical_90_count} <span style="font-size: 0.9rem; font-weight: 500;">posts</span></div>
+            </div>
+            """, unsafe_allow_html=True)
 
         if not stale_items:
             st.success("🎉 All published articles are fresh (< 30 days old). No price refresh action required!")
@@ -141,25 +156,40 @@ def render_monitor_tab():
         else:
             for post in active_posts:
                 site_name = sites.get(post.wp_site_id, "Connected Site")
-                status_icon = "🟢 Published" if post.status == "published" else "⏰ Scheduled"
-                with st.container():
-                    c_title, c_site, c_date, c_url = st.columns([3, 1.5, 1.5, 2])
-                    with c_title:
-                        st.markdown(f"**{post.title}**")
-                        st.caption(f"Keyword: `{post.target_keyword}` | Format: `{post.article_type}`")
-                    with c_site:
-                        st.write(site_name)
-                    with c_date:
-                        date_display = post.scheduled_at or post.updated_at or post.created_at
-                        st.caption(f"{status_icon}\n{date_display[:10] if date_display else 'N/A'}")
-                    with c_url:
-                        if post.published_url:
-                            st.markdown(f"[🔗 View Post]({post.published_url})")
-                        elif post.wordpress_post_id:
-                            st.write(f"Post ID: #{post.wordpress_post_id}")
-                        else:
-                            st.write("Synced")
-                    st.divider()
+                is_pub = post.status == "published"
+                status_badge_bg = "rgba(52, 199, 89, 0.1)" if is_pub else "rgba(88, 86, 214, 0.1)"
+                status_badge_fg = "#15803d" if is_pub else "#4338ca"
+                status_badge_border = "rgba(52, 199, 89, 0.25)" if is_pub else "rgba(88, 86, 214, 0.25)"
+                status_label = "🟢 Live on WP" if is_pub else "⏰ Scheduled"
+                beacon_dot = "#34c759" if is_pub else "#5856d6"
+                date_display = post.scheduled_at or post.updated_at or post.created_at
+
+                st.markdown(f"""
+                <div class="apple-card-elevated" style="margin-bottom: 12px; padding: 14px 18px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="apple-beacon-dot" style="background: {beacon_dot};"></span>
+                            <span style="font-weight: 700; font-size: 0.98rem; color: #1d1d1f;">{post.title}</span>
+                        </div>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <span class="apple-pill-badge" style="background: {status_badge_bg}; color: {status_badge_fg}; border: 1px solid {status_badge_border};">
+                                {status_label}
+                            </span>
+                            <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: #0071e3; border: 1px solid rgba(0, 113, 227, 0.2);">
+                                {site_name}
+                            </span>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.8rem; color: #86868b; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <span>Keyword: <code>{post.target_keyword}</code> • Format: <strong>{post.article_type}</strong> • Date: <strong>{date_display[:10] if date_display else 'N/A'}</strong></span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if post.published_url:
+                    st.link_button(f"🔗 View Live Post on {site_name}", post.published_url, use_container_width=True)
+                elif post.wordpress_post_id:
+                    st.caption(f"WordPress Post ID: #{post.wordpress_post_id} (Scheduled)")
 
     # TAB 3: Error Logs & 1-Click Retries
     with m_tab3:

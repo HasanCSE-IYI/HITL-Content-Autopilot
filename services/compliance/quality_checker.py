@@ -41,8 +41,8 @@ def audit_article_quality(draft: ArticleDraft) -> QualityScorecard:
         issues.append("Missing dynamic Amazon price accuracy disclaimer.")
 
     # 4. Content Structure Elements:
-    # A. Comparison Table (15 pts)
-    has_table = "|" in content and "-|-" in content
+    # A. Comparison Table (15 pts) - Handles both compact and whitespace-padded Markdown tables
+    has_table = bool(re.search(r"\|(?:\s*[-:]+\s*\|)+", content))
     if has_table:
         score += 15
     else:

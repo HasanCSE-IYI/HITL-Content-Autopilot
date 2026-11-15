@@ -68,3 +68,13 @@ def test_keyword_analyst_gemini_json_parsing():
     assert result.editorial_angles[0].name == "The Value-First Champion"
     assert result.user_questions[0].focal_answer_point.startswith("Yes, 2.4GHz")
     assert result.recommended_article_type == "roundup"
+
+def test_keyword_analyst_uses_factory_client_by_default(monkeypatch):
+    mock_factory_client = MagicMock()
+    mock_factory_client.is_configured.return_value = False
+    monkeypatch.setattr("services.research.keyword_analyst.get_llm_client", lambda: mock_factory_client)
+
+    result = analyze_keyword("standing desk converter")
+    assert result.keyword == "standing desk converter"
+    assert result.search_intent == "Commercial Investigation"
+    mock_factory_client.is_configured.assert_called_once()

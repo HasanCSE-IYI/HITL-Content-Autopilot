@@ -13,9 +13,11 @@ from core.database import (
 )
 from services.compliance.rules import enforce_nofollow_sponsored
 from services.compliance.quality_checker import audit_article_quality
-from services.generator.gemini_client import GeminiClient
+from services.generator.factory import get_llm_client
 from services.generator.prompts import build_section_regenerate_prompt
 from services.publisher.wordpress import WordPressPublisher
+from core.config import settings
+from ui.ui_utils import render_safe_image
 
 STATUS_COLORS = {
     ArticleStatus.NEEDS_REVIEW: "🟡 Needs Review",
@@ -79,22 +81,38 @@ def render_review_tab():
 
     st.markdown("---")
 
-    # 2. Quality Scorecard Ribbon
+    # 2. Quality Scorecard Bento Strip
     score = scorecard.total_score
-    score_color = "🟢" if score >= 85 else ("🟡" if score >= 70 else "🔴")
-    score_badge = f"{score_color} **Quality Score:** {score}/100"
+    score_fg = "#15803d" if score >= 85 else ("#b45309" if score >= 70 else "#b91c1c")
+    site_name = sites_map[draft.wp_site_id].name if draft.wp_site_id in sites_map else "No target site configured"
 
-    col_q1, col_q2, col_q3, col_q4 = st.columns([1, 1, 1, 2])
-    with col_q1:
-        st.markdown(f"**Status:** {STATUS_COLORS.get(draft.status, draft.status)}")
-    with col_q2:
-        st.markdown(score_badge)
-    with col_q3:
-        st.markdown(f"**Word Count:** {scorecard.word_count} words")
-    with col_q4:
-        # Target site name
-        site_name = sites_map[draft.wp_site_id].name if draft.wp_site_id in sites_map else "No target site"
-        st.caption(f"Target Site: **{site_name}**")
+    st.markdown(f"""
+    <div style="background: #ffffff; border: 1px solid rgba(0,0,0,0.08); border-radius: 16px; padding: 18px 22px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <div style="font-size: 2.2rem; font-weight: 800; color: {score_fg}; letter-spacing: -0.03em;">{score}<span style="font-size: 1.1rem; color: #86868b; font-weight: 500;">/100</span></div>
+                <div>
+                    <div style="font-weight: 700; font-size: 1.0rem; color: #1d1d1f; letter-spacing: -0.01em;">Audited Quality Score</div>
+                    <div style="font-size: 0.82rem; color: #86868b;">{scorecard.word_count} words • Target: <strong>{site_name}</strong> • Status: <strong>{STATUS_COLORS.get(draft.status, draft.status)}</strong></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.09)' if scorecard.has_ftc_disclosure else 'rgba(239,68,68,0.09)'}; color: {'#15803d' if scorecard.has_ftc_disclosure else '#b91c1c'}; border: 1px solid {'rgba(52,199,89,0.25)' if scorecard.has_ftc_disclosure else 'rgba(239,68,68,0.25)'};">
+                    FTC: {'✅ Present' if scorecard.has_ftc_disclosure else '❌ Missing'}
+                </span>
+                <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.09)' if scorecard.has_price_disclaimer else 'rgba(239,68,68,0.09)'}; color: {'#15803d' if scorecard.has_price_disclaimer else '#b91c1c'}; border: 1px solid {'rgba(52,199,89,0.25)' if scorecard.has_price_disclaimer else 'rgba(239,68,68,0.25)'};">
+                    Price Disclaimer: {'✅ Present' if scorecard.has_price_disclaimer else '❌ Missing'}
+                </span>
+                <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.09)' if scorecard.has_schema_markup else 'rgba(239,68,68,0.09)'}; color: {'#15803d' if scorecard.has_schema_markup else '#b91c1c'}; border: 1px solid {'rgba(52,199,89,0.25)' if scorecard.has_schema_markup else 'rgba(239,68,68,0.25)'};">
+                    Schema JSON-LD: {'✅ Valid' if scorecard.has_schema_markup else '❌ Missing'}
+                </span>
+                <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.09)' if scorecard.has_comparison_table else 'rgba(0,0,0,0.04)'}; color: {'#15803d' if scorecard.has_comparison_table else '#64748b'}; border: 1px solid {'rgba(52,199,89,0.25)' if scorecard.has_comparison_table else 'rgba(0,0,0,0.08)'};">
+                    Table: {'✅ Rendered' if scorecard.has_comparison_table else '—'}
+                </span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Quality details expander
     with st.expander(f"🛡️ Quality & Policy Audit Report ({score}/100)", expanded=score < 80):
@@ -169,18 +187,26 @@ def render_review_tab():
     with col_products:
         st.markdown("### 📦 Product Provenance")
         for idx, prod in enumerate(draft.products):
-            with st.expander(f"{idx+1}. {prod.badge or 'Product'}: {prod.title[:40]}...", expanded=idx == 0):
+            with st.expander(f"{idx+1}. {prod.badge or 'Product'}: {prod.title[:38]}...", expanded=idx == 0):
                 if prod.main_image:
-                    st.image(prod.main_image, use_container_width=True)
-                st.markdown(f"**ASIN:** `{prod.asin}`")
-                st.markdown(f"**Price:** `{prod.price}`")
-                st.caption(f"Source: `{prod.provenance or 'Amazon'}`")
+                    render_safe_image(prod.main_image, use_container_width=True)
+                
+                st.markdown(f"""
+                <div style="display: flex; gap: 8px; align-items: center; margin: 8px 0;">
+                    <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.09); color: #0071e3; font-weight: 700; border: 1px solid rgba(0, 113, 227, 0.2);">
+                        {prod.price or 'Price N/A'}
+                    </span>
+                    <span style="font-size: 0.8rem; color: #86868b;">ASIN: <code>{prod.asin}</code></span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.caption(f"Source: `{prod.provenance or 'Amazon Safe Scraper'}`")
                 if prod.rating:
-                    st.markdown(f"**Rating:** ⭐ {prod.rating}/5 ({prod.review_count or 0} reviews)")
+                    st.markdown(f"**Customer Rating:** ⭐ **{prod.rating}/5** ({prod.review_count or 0:,} reviews)")
                 if prod.affiliate_url:
-                    st.link_button("🔗 Affiliate Link", prod.affiliate_url, use_container_width=True)
+                    st.link_button("🔗 Verified Affiliate Link", prod.affiliate_url, use_container_width=True)
                 if prod.features:
-                    st.markdown("**Key Specs:**")
+                    st.markdown("**Key Specs & Testing Notes:**")
                     for feat in prod.features[:4]:
                         st.markdown(f"- {feat}")
 
@@ -199,7 +225,8 @@ def render_review_tab():
         tab_preview, tab_raw_md, tab_html = st.tabs(["👁️ Live Preview", "📝 Markdown Editor", "🏷️ HTML & Schema"])
 
         with tab_preview:
-            st.markdown(draft.content_markdown)
+            html_preview = markdown.markdown(draft.content_markdown, extensions=["tables", "fenced_code", "nl2br"])
+            st.markdown(f'<div class="apple-prose-container">{html_preview}</div>', unsafe_allow_html=True)
 
         with tab_raw_md:
             edit_markdown = st.text_area(
@@ -212,22 +239,94 @@ def render_review_tab():
             st.code(draft.schema_json_ld, language="html")
 
         # AI Section Regenerator
-        with st.expander("🪄 AI Section Regenerator (Refine with Gemini)"):
-            regen_input = st.text_area("Section Text to Rewrite", placeholder="Paste section here...", key="regen_text_rev")
-            regen_inst = st.text_input("Instruction", placeholder="e.g. Make it more persuasive, add comparison points...", key="regen_inst_rev")
-            if st.button("✨ Regenerate Section with Gemini", key="regen_btn_rev"):
-                client = GeminiClient()
-                if not regen_input.strip() or not regen_inst.strip():
-                    st.warning("Please provide text and instruction.")
-                else:
-                    with st.spinner("Rewriting with Gemini..."):
-                        prompt = build_section_regenerate_prompt(regen_input, regen_inst)
-                        revised_text = client.generate_text(prompt)
-                        st.text_area("Revised Markdown", value=revised_text, height=180)
-                        st.info("Copy the revised markdown above into the Markdown Editor, then click 'Save Changes'.")
+        active_provider = getattr(settings, "get_active_provider", lambda: getattr(settings, "AI_PROVIDER", "openai"))()
+        active_model_name = "GPT-6 Luna" if active_provider == "openai" else "Gemini"
 
-        # 5. Action Buttons
-        st.markdown("---")
+        with st.expander(f"🪄 AI Section Regenerator (Powered by {active_model_name})"):
+            st.caption(f"Select a quick preset or type custom instructions to rewrite any section using **{active_model_name}**.")
+            
+            # Quick preset buttons for instant UX
+            p_col1, p_col2, p_col3, p_col4 = st.columns(4)
+            with p_col1:
+                if st.button("✨ Polish Tone", key="p_btn_tone", use_container_width=True):
+                    st.session_state["regen_preset_val"] = "Make the tone authoritative, engaging, and flow naturally with seamless transitions."
+            with p_col2:
+                if st.button("⚖️ Add Specs/Data", key="p_btn_comp", use_container_width=True):
+                    st.session_state["regen_preset_val"] = "Add concrete comparison metrics, technical specs context, and value analysis."
+            with p_col3:
+                if st.button("🔍 Expand Cons/Tradeoffs", key="p_btn_cons", use_container_width=True):
+                    st.session_state["regen_preset_val"] = "Expand on real-world testing observations, ergonomic trade-offs, and critical drawbacks."
+            with p_col4:
+                if st.button("⚡ Make Punchy", key="p_btn_conc", use_container_width=True):
+                    st.session_state["regen_preset_val"] = "Tighten the prose, remove fluff, and make it crisp and skimmable for mobile readers."
+
+            default_inst = st.session_state.get("regen_preset_val", "")
+            regen_input = st.text_area("Section Text to Rewrite", placeholder="Paste section here...", key="regen_text_rev", height=110)
+            regen_inst = st.text_input("Instruction / Focus", value=default_inst, placeholder="e.g. Polish tone, add comparison points...", key="regen_inst_rev")
+            
+            if st.button(f"✨ Regenerate Section with {active_model_name}", key="regen_btn_rev", type="primary"):
+                if not regen_input.strip() or not regen_inst.strip():
+                    st.warning("Please provide both the section text and an instruction.")
+                else:
+                    with st.spinner(f"Rewriting section with {active_model_name}..."):
+                        client = get_llm_client()
+                        prompt = build_section_regenerate_prompt(regen_input, regen_inst)
+                        revised_output = client.generate_text(prompt)
+                        st.session_state["last_revised_section"] = revised_output
+                        st.session_state["last_target_section"] = regen_input.strip()
+
+            revised_text = st.session_state.get("last_revised_section")
+            target_text = st.session_state.get("last_target_section")
+
+            if revised_text:
+                st.markdown("##### 📝 Revised Markdown Preview:")
+                st.text_area("Revised Markdown", value=revised_text, height=140, key="revised_md_preview_box")
+                
+                col_rev_act1, col_rev_act2 = st.columns([1.5, 1])
+                with col_rev_act1:
+                    if st.button("📥 Apply Revision to Article Draft", type="primary", use_container_width=True, key="btn_apply_rev_direct"):
+                        # Save undo snapshot
+                        st.session_state[f"undo_draft_{draft.id}"] = draft.content_markdown
+                        if target_text and target_text in draft.content_markdown:
+                            draft.content_markdown = draft.content_markdown.replace(target_text, revised_text, 1)
+                        else:
+                            draft.content_markdown = draft.content_markdown + "\n\n" + revised_text
+                        
+                        html_body = markdown.markdown(draft.content_markdown, extensions=["tables", "fenced_code", "nl2br"])
+                        draft.content_html = enforce_nofollow_sponsored(html_body)
+                        draft.quality_scorecard = audit_article_quality(draft)
+                        save_draft(draft)
+                        st.session_state.pop("last_revised_section", None)
+                        st.session_state.pop("last_target_section", None)
+                        st.toast("✅ Applied revised section directly into draft!", icon="✨")
+                        st.rerun()
+
+                with col_rev_act2:
+                    if f"undo_draft_{draft.id}" in st.session_state:
+                        if st.button("↩️ Revert Revision (Undo)", use_container_width=True, key="btn_undo_rev_direct"):
+                            draft.content_markdown = st.session_state.pop(f"undo_draft_{draft.id}")
+                            html_body = markdown.markdown(draft.content_markdown, extensions=["tables", "fenced_code", "nl2br"])
+                            draft.content_html = enforce_nofollow_sponsored(html_body)
+                            draft.quality_scorecard = audit_article_quality(draft)
+                            save_draft(draft)
+                            st.toast("↩️ Draft reverted to previous state!", icon="🔄")
+                            st.rerun()
+
+        # 5. Apple Control Center Action Dock
+        st.markdown(f"""
+        <div class="apple-action-dock">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="apple-beacon-dot" style="background: #0071e3;"></span>
+                    <span style="font-weight: 700; font-size: 0.95rem; color: #1d1d1f; letter-spacing: -0.01em;">⚡ Editorial Execution & Publishing Dock</span>
+                </div>
+                <div style="font-size: 0.8rem; color: #86868b;">
+                    Current Status: <strong style="color: #1d1d1f;">{STATUS_COLORS.get(draft.status, draft.status)}</strong>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
         act_col1, act_col2, act_col3, act_col4 = st.columns(4)
 
         with act_col1:
@@ -242,14 +341,16 @@ def render_review_tab():
                 # Re-audit
                 draft.quality_scorecard = audit_article_quality(draft)
                 save_draft(draft)
-                st.success("✅ Changes saved!")
+                st.success("✅ Changes saved & quality re-audited!")
                 st.rerun()
+            st.caption("💾 Re-audits & saves edits")
 
         with act_col2:
             if st.button("✅ Approve Draft", use_container_width=True):
                 update_draft_status(draft.id, ArticleStatus.APPROVED)
                 st.success("Draft Approved! Ready for publishing.")
                 st.rerun()
+            st.caption("✅ Signs off quality for queue")
 
         with act_col3:
             if st.button("📅 Schedule Post", use_container_width=True):
@@ -278,6 +379,7 @@ def render_review_tab():
                             st.rerun()
                         else:
                             st.error(f"Scheduling failed: {res['message']}")
+            st.caption("📅 Queues to WP at set time")
 
         with act_col4:
             if st.button("🚀 Publish Live Now", use_container_width=True):
@@ -304,3 +406,4 @@ def render_review_tab():
                             st.rerun()
                         else:
                             st.error(f"Publish failed: {res['message']}")
+            st.caption("🚀 Immediate live WordPress push")

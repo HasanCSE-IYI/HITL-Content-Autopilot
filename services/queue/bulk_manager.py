@@ -12,11 +12,12 @@ from core.database import (
     get_wordpress_site
 )
 from services.amazon.extractor import fetch_products_hybrid
+from services.amazon.adapter import get_product_discovery_adapter
 from services.generator.roundup import generate_roundup_article
 from services.generator.review import generate_single_review_article
 from services.generator.comparison import generate_comparison_article
 from services.generator.category_recommender import recommend_category_and_tags
-from services.generator.gemini_client import GeminiClient
+from services.generator.factory import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -45,15 +46,19 @@ def process_single_task(task_id: str, delay_seconds: float = 3.0) -> bool:
         else:
             products = fetch_products_hybrid(raw_inputs)
 
+        if not products and task.keyword:
+            # Fallback to product discovery adapter for seed keyword
+            adapter = get_product_discovery_adapter()
+            products = adapter.search_products(task.keyword, limit=3)
+
         if not products:
-            # If no ASINs provided, extract from keyword or create mock research placeholder
-            update_bulk_task(task_id, status=BulkTaskStatus.FAILED, error_message="No products found or extracted from inputs.")
+            update_bulk_task(task_id, status=BulkTaskStatus.FAILED, error_message="No products found or extracted. Please provide ASINs or manual product facts.")
             return False
 
         update_bulk_task(task_id, progress=60)
 
         # 2. Content Generation
-        client = GeminiClient()
+        client = get_llm_client()
         if task.article_type == ArticleType.SINGLE_REVIEW:
             draft = generate_single_review_article(keyword=task.keyword, product=products[0], client=client)
         elif task.article_type == ArticleType.COMPARISON and len(products) >= 2:
@@ -96,18 +101,19 @@ def process_single_task(task_id: str, delay_seconds: float = 3.0) -> bool:
         return False
 
 def _run_batch_worker(batch_id: str, concurrency: int = 2, delay_seconds: float = 3.0):
-    tasks = list_bulk_tasks(batch_id=batch_id)
-    pending_tasks = [t for t in tasks if t.status == BulkTaskStatus.PENDING]
-    
-    with ThreadPoolExecutor(max_workers=max(1, concurrency)) as executor:
-        futures = [executor.submit(process_single_task, t.id, delay_seconds) for t in pending_tasks]
-        for f in futures:
-            try:
-                f.result()
-            except Exception as e:
-                logger.error(f"Worker exception: {e}")
-
-    _ACTIVE_BATCHES.pop(batch_id, None)
+    try:
+        tasks = list_bulk_tasks(batch_id=batch_id)
+        pending_tasks = [t for t in tasks if t.status == BulkTaskStatus.PENDING]
+        
+        with ThreadPoolExecutor(max_workers=max(1, concurrency)) as executor:
+            futures = [executor.submit(process_single_task, t.id, delay_seconds) for t in pending_tasks]
+            for f in futures:
+                try:
+                    f.result()
+                except Exception as e:
+                    logger.error(f"Worker exception: {e}")
+    finally:
+        _ACTIVE_BATCHES.pop(batch_id, None)
 
 def start_batch_execution(batch_id: str, concurrency: int = 2, delay_seconds: float = 3.0) -> bool:
     """

@@ -132,7 +132,7 @@ class GeminiClient:
             "message": f"{last_error} (All attempted models were unavailable or timed out)."
         }
 
-    def generate_text(self, prompt: str, temperature: float = 0.7) -> str:
+    def generate_text(self, prompt: str, temperature: float = 0.7, *args, **kwargs) -> str:
         """
         Calls Gemini API with automatic model cascading on 503 (overloaded) and 429 (rate-limited).
         """
@@ -192,11 +192,11 @@ class GeminiClient:
         all_errs = "; ".join(errors) if errors else "Google servers are currently overloaded across all tested models."
         raise RuntimeError(f"Generation failed: {all_errs}. Please try again in a few moments.")
 
-    def generate_json(self, prompt: str, temperature: float = 0.7) -> Dict[str, Any]:
+    def generate_json(self, prompt: str, temperature: float = 0.7, *args, **kwargs) -> Dict[str, Any]:
         """
         Generates text and parses it into a JSON dictionary, stripping markdown code blocks if necessary.
         """
-        raw_text = self.generate_text(prompt, temperature=temperature)
+        raw_text = self.generate_text(prompt, temperature=temperature, *args, **kwargs)
         
         # Try direct json load
         try:

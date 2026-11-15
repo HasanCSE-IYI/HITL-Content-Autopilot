@@ -147,12 +147,21 @@ class WordPressPublisher:
             return None
 
         try:
-            img_resp = requests.get(image_url, timeout=15)
-            if img_resp.status_code != 200:
-                logger.warning(f"Could not download image from {image_url}")
+            if os.path.exists(image_url):
+                with open(image_url, "rb") as f:
+                    img_bytes = f.read()
+                content_type = "image/png" if image_url.lower().endswith(".png") else "image/jpeg"
+            elif image_url.startswith(("http://", "https://")):
+                img_resp = requests.get(image_url, timeout=15)
+                if img_resp.status_code != 200:
+                    logger.warning(f"Could not download image from {image_url}")
+                    return None
+                img_bytes = img_resp.content
+                content_type = img_resp.headers.get("content-type", "image/jpeg")
+            else:
+                logger.warning(f"Invalid image source (neither local file nor valid URL): {image_url}")
                 return None
 
-            content_type = img_resp.headers.get("content-type", "image/jpeg")
             ext = "png" if "png" in content_type else "jpg"
             filename = f"featured-{abs(hash(image_url)) % 100000}.{ext}"
 
@@ -165,7 +174,7 @@ class WordPressPublisher:
             upload_resp = requests.post(
                 endpoint,
                 headers=headers,
-                data=img_resp.content,
+                data=img_bytes,
                 auth=self.auth,
                 timeout=30
             )

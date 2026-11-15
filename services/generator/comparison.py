@@ -1,9 +1,10 @@
 import re
 import markdown
-from typing import Optional
+from typing import Optional, Any
 from core.models import AmazonProduct, ArticleDraft, ArticleType, ArticleStatus
-from services.generator.gemini_client import GeminiClient
-from services.generator.prompts import build_comparison_prompt
+from core.config import settings
+from services.generator.factory import get_llm_client
+from services.generator.prompts import build_comparison_prompt, inject_affiliate_links_from_placeholders
 from services.generator.schema import (
     generate_product_schema,
     generate_faq_schema,
@@ -16,15 +17,19 @@ def generate_comparison_article(
     keyword: str,
     product_a: AmazonProduct,
     product_b: AmazonProduct,
-    client: Optional[GeminiClient] = None
+    client: Optional[Any] = None
 ) -> ArticleDraft:
     """
-    Generates a head-to-head comparison article (Product A vs Product B).
+    Generates a head-to-head comparison article (Product A vs Product B) with token optimization.
     """
-    gemini = client or GeminiClient()
+    llm = client or get_llm_client()
     prompt = build_comparison_prompt(product_a, product_b, keyword)
 
-    data = gemini.generate_json(prompt)
+    data = llm.generate_json(
+        prompt,
+        max_tokens=getattr(settings, "MAX_TOKENS_COMPARISON", 3000),
+        task_type="comparison"
+    )
 
     title = data.get("title", f"{product_a.title} vs {product_b.title}: Complete Comparison")
     meta_title = data.get("meta_title", title)
@@ -32,6 +37,19 @@ def generate_comparison_article(
     slug = data.get("slug") or re.sub(r"[^\w\s-]", "", title.lower()).strip().replace(" ", "-")[:60]
 
     raw_markdown = data.get("markdown_content", "")
+    raw_markdown = inject_affiliate_links_from_placeholders(raw_markdown, [product_a, product_b])
+
+    # Single-source FAQ injection
+    faqs = data.get("faqs", [])
+    if faqs and "## Frequently Asked Questions" not in raw_markdown and "## FAQ" not in raw_markdown:
+        faq_lines = ["\n\n## Frequently Asked Questions\n"]
+        for f in faqs:
+            q = f.get("question") or f.get("q")
+            a = f.get("answer") or f.get("a")
+            if q and a:
+                faq_lines.append(f"### {q}\n{a}\n")
+        raw_markdown += "\n".join(faq_lines)
+
     compliant_markdown = inject_compliance_markdown(raw_markdown)
 
     html_body = markdown.markdown(
@@ -41,7 +59,6 @@ def generate_comparison_article(
     compliant_html = enforce_nofollow_sponsored(html_body)
 
     schemas = [generate_product_schema(product_a), generate_product_schema(product_b)]
-    faqs = data.get("faqs", [])
     if faqs:
         schemas.append(generate_faq_schema(faqs))
     schema_html = combine_schemas_to_html(schemas)
