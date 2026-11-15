@@ -69,10 +69,10 @@ def render_settings_tab():
         st.markdown("#### 📝 Text Model Configuration")
         st.markdown("""
         <div style="background: rgba(0, 113, 227, 0.06); border: 1px solid rgba(0, 113, 227, 0.2); border-radius: 12px; padding: 12px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
-            <span class="apple-beacon-dot" style="background: #0071e3;"></span>
+            <span class="apple-beacon-dot" style="background: var(--apple-blue);"></span>
             <div>
-                <strong style="color: #0071e3; font-size: 0.95rem;">GPT-6 Luna (gpt-6-luna)</strong>
-                <div style="font-size: 0.8rem; color: #64748b;">Fast 1M+ context window, optimized token compression & affiliate schema generation.</div>
+                <strong style="color: var(--apple-blue); font-size: 0.95rem;">GPT-6 Luna (gpt-6-luna)</strong>
+                <div style="font-size: 0.8rem; color: var(--apple-ink-secondary);">Fast 1M+ context window, optimized token compression & affiliate schema generation.</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -80,10 +80,10 @@ def render_settings_tab():
         st.markdown("#### 🎨 Image Model & Quality Configuration")
         st.markdown("""
         <div style="background: rgba(168, 85, 247, 0.06); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 12px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
-            <span class="apple-beacon-dot" style="background: #a855f7;"></span>
+            <span class="apple-beacon-dot" style="background: var(--apple-purple-light);"></span>
             <div>
-                <strong style="color: #7e22ce; font-size: 0.95rem;">Image 2.5 Flare (gpt-image-2.5-flare)</strong>
-                <div style="font-size: 0.8rem; color: #64748b;">Exclusive editorial concept engine with low/medium fidelity speed modes.</div>
+                <strong style="color: var(--apple-purple-dark); font-size: 0.95rem;">Image 2.5 Flare (gpt-image-2.5-flare)</strong>
+                <div style="font-size: 0.8rem; color: var(--apple-ink-secondary);">Exclusive editorial concept engine with low/medium fidelity speed modes.</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -120,12 +120,14 @@ def render_settings_tab():
                         openai_timeout=o_timeout_val
                     )
                     st.session_state["openai_api_key"] = openai_key.strip()
+                    st.toast("💾 OpenAI & Image settings saved!", icon="✅")
                     st.success("✅ OpenAI Key, GPT-6 Luna & Image 2.5 Flare settings saved!")
                 else:
                     st.warning("Please enter a valid OpenAI API key.")
 
         with col_test_openai:
             if st.button("🔌 Test GPT-6 Luna Text", use_container_width=True, key="btn_test_openai"):
+                st.toast("Testing connection with GPT-6 Luna...", icon="🔌")
                 test_client = OpenAIClient(
                     api_key=openai_key.strip(),
                     model="gpt-6-luna",
@@ -147,6 +149,7 @@ def render_settings_tab():
 
         with col_test_img:
             if st.button("🎨 Test Image 2.5 Flare", use_container_width=True, key="btn_test_flare"):
+                st.toast("Testing Image 2.5 Flare generation...", icon="🎨")
                 test_client = OpenAIClient(
                     api_key=openai_key.strip(),
                     timeout=o_timeout_val
@@ -205,12 +208,14 @@ def render_settings_tab():
                         gemini_timeout=timeout_val
                     )
                     st.session_state["gemini_api_key"] = gemini_key.strip()
+                    st.toast("💾 Gemini settings permanently saved!", icon="✨")
                     st.success("✅ Gemini API Key & Model permanently saved!")
                 else:
                     st.warning("Please enter a valid Gemini API key.")
 
         with col_test_gemini:
             if st.button("🔌 Test Gemini Connection", use_container_width=True, key="btn_test_gemini"):
+                st.toast("Testing Gemini connection...", icon="🔌")
                 test_client = GeminiClient(
                     api_key=gemini_key.strip(),
                     model=gemini_model,
@@ -265,6 +270,7 @@ def render_settings_tab():
         col_prx_test, col_prx_info = st.columns([1, 2])
         with col_prx_test:
             if st.button("🔌 Test Proxy Connection", use_container_width=True, key="btn_test_proxy"):
+                st.toast("Testing proxy connection...", icon="🔌")
                 from services.amazon.scraper import parse_proxy_pool, check_proxy_connection
                 pool = parse_proxy_pool(proxy_input)
                 if not pool:
@@ -293,6 +299,7 @@ def render_settings_tab():
             amazon_secret_key=secret_key.strip(),
             amazon_scraper_proxy=proxy_input.strip()
         )
+        st.toast("💾 Amazon Associate & Sourcing settings saved!", icon="🛒")
         st.success("✅ Amazon Associate, PA-API & Proxy settings permanently saved!")
 
     st.markdown("---")
@@ -308,6 +315,7 @@ def render_settings_tab():
         if st.button("💾 Save Preset", key="btn_save_preset"):
             if p_name.strip() and p_asins.strip():
                 save_asin_preset(p_name.strip(), p_asins.strip(), p_kw.strip())
+                st.toast(f"💾 Preset '{p_name}' saved!", icon="📦")
                 st.success(f"Preset '{p_name}' saved!")
                 st.rerun()
             else:
@@ -323,6 +331,7 @@ def render_settings_tab():
             with col_p2:
                 if st.button("🗑️ Delete", key=f"del_preset_{ep['id']}"):
                     delete_asin_preset(ep["id"])
+                    st.toast("🗑️ Preset deleted.", icon="ℹ️")
                     st.success("Preset deleted.")
                     st.rerun()
 
@@ -351,6 +360,7 @@ def render_settings_tab():
         )
         if enable_cache != curr_cache_enabled:
             settings.save(enable_llm_cache=enable_cache)
+            st.toast(f"Response cache {'ENABLED' if enable_cache else 'DISABLED'}", icon="⚡")
             st.success(f"Response cache set to **{'ENABLED' if enable_cache else 'DISABLED'}**!")
             st.rerun()
 
@@ -358,6 +368,7 @@ def render_settings_tab():
         st.write("")
         if st.button("🗑️ Clear LLM Cache", use_container_width=True, key="btn_clear_llm_cache"):
             cleared = clear_llm_cache()
+            st.toast(f"🗑️ Cleared {cleared} cached entries!", icon="⚡")
             st.success(f"Cleared {cleared} cached LLM response entries!")
             st.rerun()
 
@@ -378,11 +389,13 @@ def render_settings_tab():
     with col_purge1:
         if st.button("🧹 Purge Mock/Test Drafts", use_container_width=True, key="btn_purge_mock_drafts"):
             purged = purge_mock_test_drafts()
+            st.toast(f"🧹 Purged {purged} mock drafts!", icon="🧹")
             st.success(f"Purged {purged} mock/test drafts!")
             st.rerun()
     with col_purge2:
         if st.button("🗑️ Reset All Drafts to Zero", use_container_width=True, key="btn_purge_all_drafts"):
             purged = purge_all_drafts()
+            st.toast(f"🗑️ Reset: {purged} drafts deleted.", icon="🗑️")
             st.success(f"Reset complete: Deleted {purged} drafts.")
             st.rerun()
 

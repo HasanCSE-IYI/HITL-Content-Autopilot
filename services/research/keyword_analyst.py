@@ -88,8 +88,25 @@ Return output strictly as JSON matching this format:
             max_tokens=getattr(settings, "MAX_TOKENS_KEYWORD", 900),
             task_type="keyword_intent"
         )
-        questions = [UserQuestion(**q) for q in data.get("user_questions", [])]
-        angles = [EditorialAngle(**a) for a in data.get("editorial_angles", [])]
+        # Resilient parsing for user questions with key aliases
+        raw_questions = data.get("user_questions", [])
+        questions = []
+        for q in raw_questions:
+            if isinstance(q, dict):
+                q_text = q.get("question") or q.get("q") or ""
+                focal = q.get("focal_answer_point") or q.get("focal") or q.get("answer") or q.get("a") or ""
+                if q_text:
+                    questions.append(UserQuestion(question=q_text, focal_answer_point=focal))
+
+        # Resilient parsing for editorial angles with key aliases
+        raw_angles = data.get("editorial_angles", [])
+        angles = []
+        for a in raw_angles:
+            if isinstance(a, dict):
+                name = a.get("name") or a.get("angle") or "Editorial Angle"
+                target = a.get("target_audience") or a.get("target") or a.get("audience") or "Target Buyers"
+                focus = a.get("editorial_focus") or a.get("focus") or "In-depth testing"
+                angles.append(EditorialAngle(name=name, target_audience=target, editorial_focus=focus))
 
         return KeywordAnalysisResult(
             keyword=clean_kw,

@@ -108,6 +108,7 @@ def init_db():
         _ensure_column(conn, "drafts", "selected_tags_json TEXT")
         _ensure_column(conn, "drafts", "scheduled_at TEXT")
         _ensure_column(conn, "drafts", "quality_scorecard_json TEXT")
+        _ensure_column(conn, "drafts", "featured_image TEXT")
 
         # 2. Key-Value Settings table
         conn.execute("""
@@ -729,6 +730,7 @@ def _row_to_draft(row: sqlite3.Row) -> ArticleDraft:
         selected_category_id=row["selected_category_id"] if "selected_category_id" in row.keys() else None,
         selected_tags=selected_tags,
         scheduled_at=row["scheduled_at"] if "scheduled_at" in row.keys() else None,
+        featured_image=row["featured_image"] if "featured_image" in row.keys() else None,
         quality_scorecard=scorecard
     )
 
@@ -749,8 +751,8 @@ def save_draft(draft: ArticleDraft, update_timestamp: bool = True) -> ArticleDra
                 wordpress_post_id, published_url,
                 wp_site_id, suggested_category_id, suggested_category_name,
                 selected_category_id, selected_tags_json, scheduled_at,
-                quality_scorecard_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                quality_scorecard_json, featured_image
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 title=excluded.title,
                 slug=excluded.slug,
@@ -772,7 +774,8 @@ def save_draft(draft: ArticleDraft, update_timestamp: bool = True) -> ArticleDra
                 selected_category_id=excluded.selected_category_id,
                 selected_tags_json=excluded.selected_tags_json,
                 scheduled_at=excluded.scheduled_at,
-                quality_scorecard_json=excluded.quality_scorecard_json
+                quality_scorecard_json=excluded.quality_scorecard_json,
+                featured_image=excluded.featured_image
         """, (
             draft.id, draft.title, draft.slug, draft.article_type, draft.target_keyword,
             draft.meta_title, draft.meta_description, products_json,
@@ -781,7 +784,7 @@ def save_draft(draft: ArticleDraft, update_timestamp: bool = True) -> ArticleDra
             draft.wordpress_post_id, draft.published_url,
             draft.wp_site_id, draft.suggested_category_id, draft.suggested_category_name,
             draft.selected_category_id, tags_json, draft.scheduled_at,
-            scorecard_json
+            scorecard_json, draft.featured_image
         ))
     conn.close()
     return draft

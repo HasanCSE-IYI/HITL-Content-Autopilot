@@ -92,6 +92,9 @@ class ArticleDraft(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     
+    # Hero & Featured Media
+    featured_image: Optional[str] = None
+
     # Multi-Site & Publishing Metadata
     wp_site_id: Optional[int] = None
     suggested_category_id: Optional[int] = None

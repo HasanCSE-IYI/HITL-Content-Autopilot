@@ -35,3 +35,24 @@ def test_fetch_products_hybrid_manual():
     assert products[0].title == "Item A"
     assert products[1].title == "Item B"
     assert products[0].price == "$20"
+
+def test_fetch_products_hybrid_delegates_to_adapter(monkeypatch):
+    from unittest.mock import MagicMock
+    from core.models import AmazonProduct
+
+    mock_adapter = MagicMock()
+    mock_adapter.get_items.return_value = [
+        AmazonProduct(
+            asin="B0CX23V2ZT",
+            title="Adapter Sourced Keyboard",
+            price="$99.00",
+            affiliate_url="https://amazon.com/dp/B0CX23V2ZT?tag=tag-20"
+        )
+    ]
+    monkeypatch.setattr("services.amazon.extractor.get_product_discovery_adapter", lambda: mock_adapter)
+
+    products = fetch_products_hybrid(["B0CX23V2ZT"])
+    assert len(products) == 1
+    assert products[0].asin == "B0CX23V2ZT"
+    assert products[0].title == "Adapter Sourced Keyboard"
+    mock_adapter.get_items.assert_called_once()

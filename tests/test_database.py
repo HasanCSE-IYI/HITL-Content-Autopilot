@@ -115,3 +115,25 @@ def test_ensure_column_validation():
     with pytest.raises(ValueError, match="Invalid column name identifier"):
         _ensure_column(conn, "drafts", "bad-col-name;-- TEXT")
 
+def test_draft_featured_image_persistence():
+    draft = ArticleDraft(
+        title="Featured Image Persistence Test",
+        slug="featured-image-persistence",
+        article_type=ArticleType.ROUNDUP,
+        target_keyword="persistence test",
+        meta_title="Meta Title",
+        meta_description="Meta Description",
+        featured_image="data/images/flare_hero.png",
+        products=[],
+        status=ArticleStatus.NEEDS_REVIEW
+    )
+    save_draft(draft)
+
+    loaded = get_draft(draft.id)
+    assert loaded is not None
+    assert loaded.featured_image == "data/images/flare_hero.png"
+
+    # Clean up
+    delete_draft(draft.id)
+    assert get_draft(draft.id) is None
+

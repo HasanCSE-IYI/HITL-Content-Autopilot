@@ -60,53 +60,84 @@ def render_multisite_tab():
 
     # 2. List Connected Sites
     if not sites:
-        st.info("ℹ️ No WordPress sites connected yet. Connect your first site above!")
+        st.markdown("""
+        <div class="apple-card-elevated" style="text-align: center; padding: 36px 20px; margin-top: 14px;">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">🌐</div>
+            <div style="font-weight: 700; font-size: 1.15rem; color: var(--apple-ink-primary); margin-bottom: 6px;">No WordPress Sites Connected Yet</div>
+            <div style="font-size: 0.88rem; color: var(--apple-ink-secondary); max-width: 520px; margin: 0 auto 16px auto;">
+                Connect your WordPress niche affiliate websites to enable 1-click publishing, automated schema injection, and category taxonomy synchronization.
+            </div>
+            <div style="display: inline-flex; justify-content: center; gap: 10px; font-size: 0.82rem; color: var(--apple-ink-secondary); background: var(--apple-surface-secondary); padding: 8px 16px; border-radius: 9999px; border: 1px solid var(--apple-border);">
+                <span>1️⃣ Log in to WP Admin</span> ➔ <span>2️⃣ Users > Profile > Application Passwords</span> ➔ <span>3️⃣ Generate Key</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
     st.markdown(f"### 📋 Connected WordPress Sites ({len(sites)})")
 
     for site in sites:
         with st.container(border=True):
-            col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
+            col1, col2, col3, col4 = st.columns([3, 2, 2.4, 1.8])
             with col1:
-                default_badge = """ <span class="apple-pill-badge" style="background: rgba(255, 149, 0, 0.1); color: #b45309; border: 1px solid rgba(255, 149, 0, 0.25);">⭐ Primary</span>""" if site.is_default else ""
-                st.markdown(f"""
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="apple-beacon-dot" style="background: #34c759;"></span>
-                    <span style="font-weight: 700; font-size: 1.05rem; color: #1d1d1f;">{site.name}</span>
-                    {default_badge}
-                </div>
-                """, unsafe_allow_html=True)
+                default_badge = ' <span class="apple-pill-badge" style="background: rgba(255, 149, 0, 0.1); color: var(--apple-amber-deep); border: 1px solid rgba(255, 149, 0, 0.25);">⭐ Primary</span>' if site.is_default else ''
+                site_header_html = (
+                    '<div style="display: flex; align-items: center; gap: 8px;">'
+                    '<span class="apple-beacon-dot" style="background: var(--apple-green);"></span>'
+                    f'<span style="font-weight: 700; font-size: 1.05rem; color: var(--apple-ink-primary);">{site.name}</span>'
+                    f'{default_badge}'
+                    '</div>'
+                )
+                st.markdown(site_header_html, unsafe_allow_html=True)
                 st.caption(f"🔗 `{site.url}` &nbsp;•&nbsp; User: `{site.username}`")
             with col2:
                 cat_count = len(site.categories)
                 tag_count = len(site.tags)
-                st.markdown(f"""
-                <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: #0071e3; border: 1px solid rgba(0, 113, 227, 0.2);">
-                    Taxonomies: {cat_count} Cats / {tag_count} Tags
-                </span>
-                """, unsafe_allow_html=True)
+                tax_badge_html = (
+                    '<span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: var(--apple-blue); border: 1px solid rgba(0, 113, 227, 0.2);">'
+                    f'Taxonomies: {cat_count} Cats / {tag_count} Tags'
+                    '</span>'
+                )
+                st.markdown(tax_badge_html, unsafe_allow_html=True)
                 last_sync = site.last_synced_at[:16].replace("T", " ") if site.last_synced_at else "Never"
                 st.caption(f"Last sync: {last_sync}")
             with col3:
-                if st.button("🔄 Sync Taxonomies", key=f"sync_btn_{site.id}", use_container_width=True, type="secondary"):
-                    with st.spinner("Fetching categories and tags from WordPress..."):
+                btn_act1, btn_act2 = st.columns(2)
+                with btn_act1:
+                    if st.button("🔌 Test", key=f"test_btn_{site.id}", use_container_width=True):
                         publisher = WordPressPublisher(site=site)
-                        res = publisher.sync_taxonomies(site.id)
-                        if res["success"]:
-                            st.success(f"Synced {res['categories_count']} categories and {res['tags_count']} tags!")
-                            st.rerun()
+                        t_res = publisher.test_connection()
+                        if t_res["success"]:
+                            st.toast(f"✅ Connection OK: {t_res.get('user', 'Connected')}", icon="🌐")
+                            st.success(t_res["message"])
                         else:
-                            st.error(f"Sync failed: {res['message']}")
+                            st.toast("❌ Connection failed", icon="⚠️")
+                            st.error(t_res["message"])
+                with btn_act2:
+                    if st.button("🔄 Sync", key=f"sync_btn_{site.id}", use_container_width=True, type="secondary"):
+                        with st.spinner("Fetching categories & tags..."):
+                            publisher = WordPressPublisher(site=site)
+                            res = publisher.sync_taxonomies(site.id)
+                            if res["success"]:
+                                st.toast(f"✅ Synced {res['categories_count']} categories!", icon="🔄")
+                                st.success(f"Synced {res['categories_count']} categories and {res['tags_count']} tags!")
+                                st.rerun()
+                            else:
+                                st.error(f"Sync failed: {res['message']}")
             with col4:
                 btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
-                    if not site.is_default and st.button("⭐ Default", key=f"def_btn_{site.id}", use_container_width=True):
-                        set_default_wordpress_site(site.id)
-                        st.rerun()
+                    if not site.is_default:
+                        if st.button("⭐ Default", key=f"def_btn_{site.id}", use_container_width=True):
+                            set_default_wordpress_site(site.id)
+                            st.toast(f"⭐ Set '{site.name}' as default primary site!", icon="⭐")
+                            st.rerun()
+                    else:
+                        st.markdown("""<div style="text-align: center; padding-top: 6px;"><span class="apple-pill-badge" style="background: rgba(255, 149, 0, 0.1); color: var(--apple-amber-deep); border: 1px solid rgba(255, 149, 0, 0.25);">⭐ Primary</span></div>""", unsafe_allow_html=True)
                 with btn_col2:
                     if st.button("🗑️ Delete", key=f"del_site_{site.id}", use_container_width=True):
                         delete_wordpress_site(site.id)
+                        st.toast(f"🗑️ Deleted site: {site.name}", icon="🗑️")
                         st.warning(f"Deleted {site.name}")
                         st.rerun()
 

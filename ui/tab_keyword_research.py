@@ -37,20 +37,20 @@ def render_keyword_research_tab():
 
         # Top Intent & Format Summary (Apple Capsule Pills)
         intent_bg, intent_fg, intent_border = {
-            "Commercial Investigation": ("rgba(0, 113, 227, 0.09)", "#0071e3", "rgba(0, 113, 227, 0.25)"),
-            "Transactional": ("rgba(52, 199, 89, 0.09)", "#15803d", "rgba(52, 199, 89, 0.25)"),
-            "Informational": ("rgba(255, 149, 0, 0.09)", "#b45309", "rgba(255, 149, 0, 0.25)")
-        }.get(result.search_intent, ("rgba(100, 116, 139, 0.09)", "#475569", "rgba(100, 116, 139, 0.2)"))
+            "Commercial Investigation": ("rgba(0, 113, 227, 0.09)", "var(--apple-blue)", "rgba(0, 113, 227, 0.25)"),
+            "Transactional": ("rgba(52, 199, 89, 0.09)", "var(--apple-green-dark)", "rgba(52, 199, 89, 0.25)"),
+            "Informational": ("rgba(255, 149, 0, 0.09)", "var(--apple-amber-deep)", "rgba(255, 149, 0, 0.25)")
+        }.get(result.search_intent, ("rgba(100, 116, 139, 0.09)", "var(--apple-slate-dark)", "rgba(100, 116, 139, 0.2)"))
 
         st.markdown(f"""
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;">
             <span class="apple-pill-badge" style="background: {intent_bg}; color: {intent_fg}; border: 1px solid {intent_border}; font-size: 0.84rem; padding: 5px 14px;">
                 🎯 Search Intent: <strong>{result.search_intent}</strong>
             </span>
-            <span class="apple-pill-badge" style="background: rgba(88, 86, 214, 0.09); color: #4338ca; border: 1px solid rgba(88, 86, 214, 0.25); font-size: 0.84rem; padding: 5px 14px;">
+            <span class="apple-pill-badge" style="background: rgba(88, 86, 214, 0.09); color: var(--apple-indigo-dark); border: 1px solid rgba(88, 86, 214, 0.25); font-size: 0.84rem; padding: 5px 14px;">
                 📄 Format: <strong>{result.recommended_article_type.title()}</strong>
             </span>
-            <span style="color: #64748b; font-size: 0.88rem; margin-left: 4px;">{result.intent_explanation}</span>
+            <span style="color: var(--apple-ink-secondary); font-size: 0.88rem; margin-left: 4px;">{result.intent_explanation}</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -88,19 +88,26 @@ def render_keyword_research_tab():
         st.caption("Choose an editorial perspective tailored to your audience to avoid generic affiliate copy.")
 
         cols = st.columns(3)
-        angle_icons = ["💎", "⚖️", "⚡"]
+        angle_themes = [
+            ("💎", "var(--apple-blue)", "rgba(0, 113, 227, 0.08)", "rgba(0, 113, 227, 0.25)"),
+            ("⚖️", "var(--apple-purple)", "rgba(175, 82, 222, 0.08)", "rgba(175, 82, 222, 0.25)"),
+            ("⚡", "var(--apple-green)", "rgba(52, 199, 89, 0.08)", "rgba(52, 199, 89, 0.25)")
+        ]
         for idx, angle in enumerate(result.editorial_angles):
+            theme = angle_themes[idx % len(angle_themes)]
             with cols[idx % 3]:
                 with st.container(border=True):
-                    icon = angle_icons[idx % len(angle_icons)]
-                    st.markdown(f"#### {icon} {angle.name}")
-                    st.markdown(f"""
-                    <div style="margin-bottom: 8px;">
-                        <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: #0071e3; border: 1px solid rgba(0, 113, 227, 0.2);">
-                            Audience: {angle.target_audience}
-                        </span>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    card_html = (
+                        f'<div style="border-left: 3px solid {theme[1]}; padding-left: 10px; margin-bottom: 8px;">'
+                        f'<div style="font-size: 1.15rem; font-weight: 700; color: var(--apple-ink-primary);">{theme[0]} {angle.name}</div>'
+                        '</div>'
+                        '<div style="margin-bottom: 8px;">'
+                        f'<span class="apple-pill-badge" style="background: {theme[2]}; color: {theme[1]}; border: 1px solid {theme[3]};">'
+                        f'Audience: {angle.target_audience}'
+                        '</span>'
+                        '</div>'
+                    )
+                    st.markdown(card_html, unsafe_allow_html=True)
                     st.markdown(f"**Core Editorial Focus:**\n*{angle.editorial_focus}*")
                     st.write("")
                     if st.button(f"🚀 Dispatch to Single Workflow", key=f"btn_angle_{idx}", use_container_width=True, type="secondary"):

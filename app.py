@@ -40,6 +40,7 @@ st.markdown("""
         --apple-bg: #fbfbfd;
         --apple-surface: rgba(255, 255, 255, 0.86);
         --apple-surface-card: #ffffff;
+        --apple-surface-secondary: rgba(0, 0, 0, 0.04);
         --apple-blue: #0071e3;
         --apple-blue-hover: #0077ed;
         --apple-green: #34c759;
@@ -48,12 +49,72 @@ st.markdown("""
         --apple-purple: #af52de;
         --apple-ink-primary: #1d1d1f;
         --apple-ink-secondary: #6e6e73;
+        --apple-ink-tertiary: #86868b;
         --apple-border: rgba(0, 0, 0, 0.08);
+        --apple-border-strong: rgba(0, 0, 0, 0.16);
         --apple-border-focus: rgba(0, 113, 227, 0.4);
+        --apple-input-bg: #ffffff;
+        --apple-dock-bg: rgba(255, 255, 255, 0.88);
         --apple-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
         --apple-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
         --apple-shadow-hover: 0 14px 34px -4px rgba(0, 0, 0, 0.09), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
         --apple-ease: cubic-bezier(0.16, 1, 0.3, 1);
+        /* Status Semantic Tokens */
+        --apple-green-dark: #15803d;
+        --apple-green-deep: #166534;
+        --apple-red: #ef4444;
+        --apple-red-dark: #b91c1c;
+        --apple-red-deep: #991b1b;
+        --apple-red-deepest: #7f1d1d;
+        --apple-amber-dark: #d97706;
+        --apple-amber-deep: #b45309;
+        --apple-amber-burnt: #92400e;
+        --apple-orange: #f59e0b;
+        --apple-orange-dark: #c2410c;
+        --apple-orange-deep: #9a3412;
+        --apple-indigo-dark: #4338ca;
+        --apple-purple-dark: #7e22ce;
+        --apple-purple-light: #a855f7;
+        --apple-slate: #94a3b8;
+        --apple-slate-dark: #475569;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --apple-bg: #000000;
+            --apple-surface: rgba(28, 28, 30, 0.86);
+            --apple-surface-card: #1c1c1e;
+            --apple-surface-secondary: #2c2c2e;
+            --apple-ink-primary: #f5f5f7;
+            --apple-ink-secondary: #a1a1a6;
+            --apple-ink-tertiary: #86868b;
+            --apple-border: rgba(255, 255, 255, 0.12);
+            --apple-border-strong: rgba(255, 255, 255, 0.22);
+            --apple-border-focus: rgba(0, 113, 227, 0.6);
+            --apple-input-bg: #2c2c2e;
+            --apple-dock-bg: rgba(28, 28, 30, 0.92);
+            --apple-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --apple-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+            --apple-shadow-hover: 0 14px 34px -4px rgba(0, 0, 0, 0.6), 0 4px 12px -2px rgba(0, 0, 0, 0.3);
+            /* Status Semantic Tokens — Dark */
+            --apple-green-dark: #4ade80;
+            --apple-green-deep: #86efac;
+            --apple-red: #f87171;
+            --apple-red-dark: #fca5a5;
+            --apple-red-deep: #fecaca;
+            --apple-red-deepest: #fecaca;
+            --apple-amber-dark: #fbbf24;
+            --apple-amber-deep: #fcd34d;
+            --apple-amber-burnt: #fde68a;
+            --apple-orange: #fbbf24;
+            --apple-orange-dark: #fb923c;
+            --apple-orange-deep: #fdba74;
+            --apple-indigo-dark: #818cf8;
+            --apple-purple-dark: #c084fc;
+            --apple-purple-light: #d8b4fe;
+            --apple-slate: #cbd5e1;
+            --apple-slate-dark: #94a3b8;
+        }
     }
 
     html, body, [class*="css"] {
@@ -62,6 +123,31 @@ st.markdown("""
         color: var(--apple-ink-primary);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* macOS Cupertino Custom Scrollbars */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--apple-surface-secondary);
+        border-radius: 9999px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--apple-ink-tertiary);
+    }
+
+    /* Streamlit Code Blocks */
+    [data-testid="stCodeBlock"] {
+        border-radius: 12px !important;
+        border: 1px solid var(--apple-border) !important;
+        overflow: hidden !important;
     }
 
     /* Full width optimization with generous breathing room */
@@ -159,10 +245,10 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px !important;
         margin-bottom: 24px !important;
-        background: rgba(0, 0, 0, 0.04) !important;
+        background: var(--apple-surface-secondary) !important;
         padding: 6px !important;
         border-radius: 14px !important;
-        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid var(--apple-border) !important;
     }
     .stTabs [data-baseweb="tab"] {
         height: 44px !important;
@@ -178,10 +264,10 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab"]:hover {
         color: var(--apple-ink-primary) !important;
-        background: rgba(255, 255, 255, 0.5) !important;
+        background: rgba(125, 125, 125, 0.12) !important;
     }
     .stTabs [aria-selected="true"] {
-        background: #ffffff !important;
+        background: var(--apple-surface-card) !important;
         color: var(--apple-blue) !important;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
         font-weight: 700 !important;
@@ -210,26 +296,27 @@ st.markdown("""
         transform: translateY(-1px) !important;
     }
     button[kind="secondary"] {
-        background: rgba(0, 0, 0, 0.035) !important;
-        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        background: var(--apple-surface-secondary) !important;
+        border: 1px solid var(--apple-border) !important;
         color: var(--apple-ink-primary) !important;
     }
     button[kind="secondary"]:hover {
-        background: rgba(0, 0, 0, 0.065) !important;
-        border-color: rgba(0, 0, 0, 0.16) !important;
+        background: rgba(125, 125, 125, 0.15) !important;
+        border-color: var(--apple-border-strong) !important;
     }
 
     /* Inputs & Textareas */
     input, textarea, select {
         border-radius: 10px !important;
-        border: 1px solid rgba(0, 0, 0, 0.12) !important;
-        background: #ffffff !important;
+        border: 1px solid var(--apple-border) !important;
+        background: var(--apple-input-bg) !important;
+        color: var(--apple-ink-primary) !important;
         font-size: 0.94rem !important;
         transition: all 0.18s var(--apple-ease) !important;
     }
     input:focus, textarea:focus {
         border-color: var(--apple-blue) !important;
-        box-shadow: 0 0 0 3.5px rgba(0, 113, 227, 0.18) !important;
+        box-shadow: 0 0 0 3.5px var(--apple-border-focus) !important;
         outline: none !important;
     }
 
@@ -244,18 +331,18 @@ st.markdown("""
         margin-bottom: 14px !important;
     }
     [data-testid="stExpander"]:hover {
-        border-color: rgba(0, 113, 227, 0.2) !important;
+        border-color: rgba(0, 113, 227, 0.25) !important;
         box-shadow: var(--apple-shadow-md) !important;
     }
 
     /* macOS Floating Telemetry Dock */
     .bottom-status-container {
-        background: rgba(255, 255, 255, 0.88) !important;
-        border: 1px solid rgba(0, 0, 0, 0.09) !important;
+        background: var(--apple-dock-bg) !important;
+        border: 1px solid var(--apple-border) !important;
         border-radius: 20px !important;
         padding: 18px 24px !important;
         margin-top: 36px !important;
-        box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02) !important;
+        box-shadow: var(--apple-shadow-md) !important;
         backdrop-filter: blur(24px) !important;
         -webkit-backdrop-filter: blur(24px) !important;
     }
@@ -270,18 +357,18 @@ st.markdown("""
 
     /* Apple Bento Metrics Grid */
     .apple-bento-card {
-        background: #ffffff !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        background: var(--apple-surface-card) !important;
+        border: 1px solid var(--apple-border) !important;
         border-radius: 16px !important;
         padding: 16px 20px !important;
-        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+        box-shadow: var(--apple-shadow-sm) !important;
         transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
         height: 100% !important;
         position: relative !important;
     }
     .apple-bento-card:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.08), 0 4px 8px -2px rgba(0, 0, 0, 0.03) !important;
+        box-shadow: var(--apple-shadow-hover) !important;
         border-color: rgba(0, 113, 227, 0.28) !important;
     }
     .bento-header {
@@ -295,7 +382,7 @@ st.markdown("""
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        color: #6e6e73;
+        color: var(--apple-ink-secondary) !important;
     }
     .bento-icon-badge {
         width: 28px;
@@ -310,29 +397,29 @@ st.markdown("""
         font-size: 2.15rem;
         font-weight: 800;
         letter-spacing: -0.03em;
-        color: #1d1d1f;
+        color: var(--apple-ink-primary);
         line-height: 1.1;
         margin-bottom: 4px;
     }
     .bento-subtitle {
         font-size: 0.8rem;
-        color: #86868b;
+        color: var(--apple-ink-tertiary);
         font-weight: 500;
     }
 
     /* macOS Status Cards */
     .apple-status-card {
-        background: #ffffff !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        background: var(--apple-surface-card) !important;
+        border: 1px solid var(--apple-border) !important;
         border-radius: 14px !important;
         padding: 14px 16px !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+        box-shadow: var(--apple-shadow-sm) !important;
         transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
         height: 100% !important;
     }
     .apple-status-card:hover {
         border-color: rgba(0, 113, 227, 0.3) !important;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06) !important;
+        box-shadow: var(--apple-shadow-hover) !important;
         transform: translateY(-1px) !important;
     }
     .status-card-header {
@@ -346,48 +433,48 @@ st.markdown("""
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        color: #86868b;
+        color: var(--apple-ink-tertiary);
     }
     .status-card-title {
         font-size: 0.96rem;
         font-weight: 700;
-        color: #1d1d1f;
+        color: var(--apple-ink-primary);
         letter-spacing: -0.01em;
         margin-bottom: 2px;
     }
     .status-card-meta {
         font-size: 0.79rem;
-        color: #6e6e73;
+        color: var(--apple-ink-secondary);
         line-height: 1.35;
     }
 
     /* Apple Prose Styling for Markdown Preview */
     .apple-prose-container {
         font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "SF Pro Text", sans-serif;
-        color: #1d1d1f;
+        color: var(--apple-ink-primary);
         line-height: 1.72;
         font-size: 1.02rem;
-        background: #ffffff;
-        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: var(--apple-surface-card);
+        border: 1px solid var(--apple-border);
         border-radius: 16px;
         padding: 24px 30px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        box-shadow: var(--apple-shadow-sm);
     }
     .apple-prose-container h1 {
         font-size: 1.85rem;
         font-weight: 800;
         letter-spacing: -0.03em;
-        color: #111827;
+        color: var(--apple-ink-primary);
         margin-top: 1.2rem;
         margin-bottom: 0.8rem;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+        border-bottom: 1px solid var(--apple-border);
         padding-bottom: 8px;
     }
     .apple-prose-container h2 {
         font-size: 1.45rem;
         font-weight: 700;
         letter-spacing: -0.025em;
-        color: #1f2937;
+        color: var(--apple-ink-primary);
         margin-top: 1.5rem;
         margin-bottom: 0.6rem;
     }
@@ -395,53 +482,53 @@ st.markdown("""
         font-size: 1.2rem;
         font-weight: 600;
         letter-spacing: -0.015em;
-        color: #374151;
+        color: var(--apple-ink-primary);
         margin-top: 1.2rem;
         margin-bottom: 0.5rem;
     }
     .apple-prose-container p {
         margin-bottom: 1.1rem;
-        color: #374151;
+        color: var(--apple-ink-secondary);
     }
     .apple-prose-container blockquote {
-        background: linear-gradient(135deg, rgba(0, 113, 227, 0.05) 0%, rgba(0, 113, 227, 0.02) 100%) !important;
-        border-left: 4px solid #0071e3 !important;
+        background: rgba(0, 113, 227, 0.06) !important;
+        border-left: 4px solid var(--apple-blue) !important;
         border-radius: 0 12px 12px 0 !important;
         padding: 14px 20px !important;
         margin: 20px 0 !important;
-        color: #1e293b !important;
+        color: var(--apple-ink-primary) !important;
         font-style: italic;
     }
     .apple-prose-container table {
         border-collapse: separate !important;
         border-spacing: 0 !important;
-        border: 1px solid rgba(0, 0, 0, 0.09) !important;
+        border: 1px solid var(--apple-border) !important;
         border-radius: 14px !important;
         overflow: hidden !important;
         width: 100% !important;
         margin: 22px 0 !important;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02) !important;
+        box-shadow: var(--apple-shadow-sm) !important;
     }
     .apple-prose-container th {
-        background: #f8fafc !important;
+        background: var(--apple-surface-secondary) !important;
         padding: 12px 16px !important;
         font-weight: 700 !important;
         font-size: 0.9rem !important;
-        color: #1e293b !important;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.09) !important;
+        color: var(--apple-ink-primary) !important;
+        border-bottom: 1px solid var(--apple-border) !important;
         letter-spacing: 0.01em !important;
     }
     .apple-prose-container td {
         padding: 12px 16px !important;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+        border-bottom: 1px solid var(--apple-border) !important;
         font-size: 0.92rem !important;
-        color: #334155 !important;
+        color: var(--apple-ink-secondary) !important;
     }
     .apple-prose-container tr:last-child td {
         border-bottom: none !important;
     }
     .apple-prose-container tr:nth-child(even) {
-        background-color: rgba(248, 250, 252, 0.6);
+        background-color: var(--apple-surface-secondary);
     }
     .apple-prose-container img {
         border-radius: 12px;
@@ -452,29 +539,29 @@ st.markdown("""
 
     /* Apple Action Dock (Control Center Styling) */
     .apple-action-dock {
-        background: rgba(255, 255, 255, 0.92) !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        background: var(--apple-dock-bg) !important;
+        border: 1px solid var(--apple-border) !important;
         border-radius: 18px !important;
         padding: 18px 24px !important;
         margin-top: 26px !important;
         margin-bottom: 14px !important;
-        box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.02) !important;
+        box-shadow: var(--apple-shadow-md) !important;
         backdrop-filter: blur(24px) !important;
         -webkit-backdrop-filter: blur(24px) !important;
     }
 
     /* Apple Elevated Card */
     .apple-card-elevated {
-        background: #ffffff !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        background: var(--apple-surface-card) !important;
+        border: 1px solid var(--apple-border) !important;
         border-radius: 16px !important;
         padding: 18px 22px !important;
-        box-shadow: 0 3px 14px rgba(0, 0, 0, 0.03) !important;
+        box-shadow: var(--apple-shadow-sm) !important;
         transition: transform 0.22s var(--apple-ease), box-shadow 0.22s var(--apple-ease) !important;
     }
     .apple-card-elevated:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.07) !important;
+        box-shadow: var(--apple-shadow-hover) !important;
     }
 
     /* Pill Badges */
@@ -499,21 +586,21 @@ st.markdown("""
     /* Adaptive Dark Mode Support (Apple Dark HIG) */
     @media (prefers-color-scheme: dark) {
         .apple-bento-card, .apple-status-card, .apple-action-dock, .apple-card-elevated, .apple-prose-container {
-            background: #1c1c1e !important;
-            border-color: rgba(255, 255, 255, 0.12) !important;
-            color: #f5f5f7 !important;
+            background: var(--apple-surface-card) !important;
+            border-color: var(--apple-border) !important;
+            color: var(--apple-ink-primary) !important;
         }
         .apple-prose-container th {
-            background: #2c2c2e !important;
-            color: #f5f5f7 !important;
-            border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+            background: var(--apple-surface-secondary) !important;
+            color: var(--apple-ink-primary) !important;
+            border-bottom-color: var(--apple-border) !important;
         }
         .apple-prose-container td {
-            color: #e5e7eb !important;
+            color: var(--apple-ink-secondary) !important;
             border-bottom-color: rgba(255, 255, 255, 0.06) !important;
         }
         .bento-value, .status-card-title, .main-header {
-            color: #f5f5f7 !important;
+            color: var(--apple-ink-primary) !important;
         }
     }
 </style>
@@ -544,7 +631,7 @@ st.markdown("""
 <div class="brand-container">
     <div class="brand-logo-badge">🛒</div>
     <div>
-        <div class="main-header">HITL Content Autopilot <span style="font-size: 0.95rem; color: #0071e3; font-weight: 700; vertical-align: middle; background: rgba(0, 113, 227, 0.09); padding: 3px 12px; border-radius: 9999px; border: 1px solid rgba(0, 113, 227, 0.2);">v2.0 Pro</span></div>
+        <div class="main-header">HITL Content Autopilot <span style="font-size: 0.95rem; color: var(--apple-blue); font-weight: 700; vertical-align: middle; background: rgba(0, 113, 227, 0.09); padding: 3px 12px; border-radius: 9999px; border: 1px solid rgba(0, 113, 227, 0.2);">v2.0 Pro</span></div>
     </div>
 </div>
 <div class="sub-header">
@@ -559,7 +646,7 @@ with m1:
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Total Articles</span>
-            <span class="bento-icon-badge" style="background: rgba(0, 113, 227, 0.09); color: #0071e3;">📦</span>
+            <span class="bento-icon-badge" style="background: rgba(0, 113, 227, 0.09); color: var(--apple-blue);">📦</span>
         </div>
         <div class="bento-value">{total_count}</div>
         <div class="bento-subtitle">All drafts in database</div>
@@ -570,9 +657,9 @@ with m2:
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Needs Review</span>
-            <span class="bento-icon-badge" style="background: rgba(255, 149, 0, 0.1); color: #ff9500;">🟡</span>
+            <span class="bento-icon-badge" style="background: rgba(255, 149, 0, 0.1); color: var(--apple-amber);">🟡</span>
         </div>
-        <div class="bento-value" style="color: #d97706;">{needs_review}</div>
+        <div class="bento-value" style="color: var(--apple-amber-dark);">{needs_review}</div>
         <div class="bento-subtitle">Awaiting HITL audit</div>
     </div>
     """, unsafe_allow_html=True)
@@ -581,9 +668,9 @@ with m3:
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Approved</span>
-            <span class="bento-icon-badge" style="background: rgba(52, 199, 89, 0.1); color: #34c759;">🟢</span>
+            <span class="bento-icon-badge" style="background: rgba(52, 199, 89, 0.1); color: var(--apple-green);">🟢</span>
         </div>
-        <div class="bento-value" style="color: #15803d;">{approved}</div>
+        <div class="bento-value" style="color: var(--apple-green-dark);">{approved}</div>
         <div class="bento-subtitle">Ready for publishing</div>
     </div>
     """, unsafe_allow_html=True)
@@ -592,9 +679,9 @@ with m4:
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Scheduled</span>
-            <span class="bento-icon-badge" style="background: rgba(88, 86, 214, 0.1); color: #5856d6;">📅</span>
+            <span class="bento-icon-badge" style="background: rgba(88, 86, 214, 0.1); color: var(--apple-indigo);">📅</span>
         </div>
-        <div class="bento-value" style="color: #4338ca;">{scheduled}</div>
+        <div class="bento-value" style="color: var(--apple-indigo-dark);">{scheduled}</div>
         <div class="bento-subtitle">Auto-publish queue</div>
     </div>
     """, unsafe_allow_html=True)
@@ -603,9 +690,9 @@ with m5:
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Published</span>
-            <span class="bento-icon-badge" style="background: rgba(175, 82, 222, 0.1); color: #af52de;">🟣</span>
+            <span class="bento-icon-badge" style="background: rgba(175, 82, 222, 0.1); color: var(--apple-purple);">🟣</span>
         </div>
-        <div class="bento-value" style="color: #7e22ce;">{published}</div>
+        <div class="bento-value" style="color: var(--apple-purple-dark);">{published}</div>
         <div class="bento-subtitle">Live on WordPress</div>
     </div>
     """, unsafe_allow_html=True)
@@ -675,10 +762,10 @@ st.markdown("---")
 st.markdown("""
 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
     <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="apple-beacon-dot" style="background: #34c759;"></span>
-        <span style="font-weight: 700; font-size: 0.95rem; color: #1d1d1f; letter-spacing: -0.01em;">macOS System Telemetry & Engine Dock</span>
+        <span class="apple-beacon-dot" style="background: var(--apple-green);"></span>
+        <span style="font-weight: 700; font-size: 0.95rem; color: var(--apple-ink-primary); letter-spacing: -0.01em;">macOS System Telemetry & Engine Dock</span>
     </div>
-    <span style="font-size: 0.8rem; color: #86868b; font-weight: 500;">Live Local-First SQLite</span>
+    <span style="font-size: 0.8rem; color: var(--apple-ink-tertiary); font-weight: 500;">Live Local-First SQLite</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -687,7 +774,7 @@ b1, b2, b3, b4, b5 = st.columns([1.3, 1.3, 1.1, 1.2, 1.1])
 with b1:
     if active_provider == "openai":
         is_ok = bool(active_openai_key)
-        beacon_color = "#34c759" if is_ok else "#ef4444"
+        beacon_color = "var(--apple-green)" if is_ok else "var(--apple-red)"
         st.markdown(f"""
         <div class="apple-status-card">
             <div class="status-card-header">
@@ -700,7 +787,7 @@ with b1:
         """, unsafe_allow_html=True)
     else:
         is_ok = bool(active_gemini_key)
-        beacon_color = "#34c759" if is_ok else "#ef4444"
+        beacon_color = "var(--apple-green)" if is_ok else "var(--apple-red)"
         st.markdown(f"""
         <div class="apple-status-card">
             <div class="status-card-header">
@@ -736,7 +823,7 @@ with b2:
         st.markdown(f"""
         <div class="apple-status-card">
             <div class="status-card-header">
-                <span class="apple-beacon-dot" style="background: #34c759;"></span>
+                <span class="apple-beacon-dot" style="background: var(--apple-green);"></span>
                 <span class="status-card-label">WordPress Sync</span>
             </div>
             <div class="status-card-title">{len(sites)} Connected Site(s)</div>
@@ -747,7 +834,7 @@ with b2:
         st.markdown("""
         <div class="apple-status-card">
             <div class="status-card-header">
-                <span class="apple-beacon-dot" style="background: #f59e0b;"></span>
+                <span class="apple-beacon-dot" style="background: var(--apple-orange);"></span>
                 <span class="status-card-label">WordPress Sync</span>
             </div>
             <div class="status-card-title">0 Sites Connected</div>
@@ -759,7 +846,7 @@ with b3:
     st.markdown(f"""
     <div class="apple-status-card">
         <div class="status-card-header">
-            <span class="apple-beacon-dot" style="background: #0071e3;"></span>
+            <span class="apple-beacon-dot" style="background: var(--apple-blue);"></span>
             <span class="status-card-label">Amazon Associate</span>
         </div>
         <div class="status-card-title"><code>{settings.AMAZON_ASSOCIATE_TAG}</code></div>
@@ -775,7 +862,7 @@ with b4:
     st.markdown(f"""
     <div class="apple-status-card">
         <div class="status-card-header">
-            <span class="apple-beacon-dot" style="background: #0071e3;"></span>
+            <span class="apple-beacon-dot" style="background: var(--apple-blue);"></span>
             <span class="status-card-label">Token Telemetry</span>
         </div>
         <div class="status-card-title">{tot_k}k Tokens Used</div>
@@ -787,7 +874,7 @@ with b5:
     st.markdown("""
     <div class="apple-status-card">
         <div class="status-card-header">
-            <span class="apple-beacon-dot" style="background: #34c759;"></span>
+            <span class="apple-beacon-dot" style="background: var(--apple-green);"></span>
             <span class="status-card-label">Compliance Guard</span>
         </div>
         <div class="status-card-title">SQLite WAL Guard</div>

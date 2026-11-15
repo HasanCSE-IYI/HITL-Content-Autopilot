@@ -23,6 +23,8 @@ from services.generator.openai_client import OpenAIClient
 from services.generator.factory import get_llm_client
 from services.media.image_generator import create_article_hero_image
 from services.amazon.csv_importer import generate_product_facts_csv_template, parse_product_facts_csv
+from services.compliance.rules import enforce_nofollow_sponsored
+from services.compliance.quality_checker import audit_article_quality
 from core.config import SUPPORTED_OPENAI_MODELS, DEFAULT_OPENAI_MODEL
 
 SAMPLE_ASINS = """B0CX23V2ZT
@@ -45,31 +47,38 @@ Link: https://www.amazon.com/dp/B09V3HN1KC"""
 
 def render_single_workflow_tab():
     st.subheader("🚀 Single Keyword Research & Generation Workflow")
-    st.caption("End-to-end workflow: Keyword $\rightarrow$ Product Sourcing & Scoring $\rightarrow$ SEO Drafting $\rightarrow$ AI Taxonomy Recommendation.")
+    st.caption("End-to-end workflow: Keyword → Product Sourcing & Scoring → SEO Drafting → AI Taxonomy Recommendation.")
 
-    st.markdown("""
-    <div style="background: rgba(0,0,0,0.025); border: 1px solid rgba(0,0,0,0.06); border-radius: 14px; padding: 10px 18px; margin-bottom: 22px; display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="background: #0071e3; color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; box-shadow: 0 2px 6px rgba(0,113,227,0.3);">1</span>
-            <span style="font-weight: 700; font-size: 0.88rem; color: #1d1d1f; letter-spacing: -0.01em;">Topic & Format</span>
-        </div>
-        <span style="color: #cbd5e1; font-weight: bold;">➔</span>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="background: rgba(0, 113, 227, 0.1); color: #0071e3; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">2</span>
-            <span style="font-weight: 600; font-size: 0.88rem; color: #64748b; letter-spacing: -0.01em;">Sourcing & 0–100 Audit</span>
-        </div>
-        <span style="color: #cbd5e1; font-weight: bold;">➔</span>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="background: rgba(0, 113, 227, 0.1); color: #0071e3; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">3</span>
-            <span style="font-weight: 600; font-size: 0.88rem; color: #64748b; letter-spacing: -0.01em;">AI Drafting & Visuals</span>
-        </div>
-        <span style="color: #cbd5e1; font-weight: bold;">➔</span>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="background: rgba(0, 113, 227, 0.1); color: #0071e3; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">4</span>
-            <span style="font-weight: 600; font-size: 0.88rem; color: #64748b; letter-spacing: -0.01em;">HITL Studio Approval</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    current_stage = st.session_state.get("sw_stage", 1)
+
+    def render_step_chip(step_num: int, label: str, active: bool, completed: bool) -> str:
+        if completed:
+            badge_html = '<span style="background: var(--apple-green); color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">✓</span>'
+            text_color = "var(--apple-ink-primary)"
+        elif active:
+            badge_html = f'<span style="background: var(--apple-blue); color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; box-shadow: 0 2px 6px rgba(0,113,227,0.3);">{step_num}</span>'
+            text_color = "var(--apple-blue)"
+        else:
+            badge_html = f'<span style="background: var(--apple-surface-secondary); color: var(--apple-ink-tertiary); border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">{step_num}</span>'
+            text_color = "var(--apple-ink-secondary)"
+
+        font_weight = "700" if active else ("600" if completed else "500")
+        return f'<div style="display: flex; align-items: center; gap: 8px;">{badge_html}<span style="font-weight: {font_weight}; font-size: 0.88rem; color: {text_color}; letter-spacing: -0.01em;">{label}</span></div>'
+
+    s1_html = render_step_chip(1, "Topic & Format", active=current_stage == 1, completed=current_stage > 1)
+    s2_html = render_step_chip(2, "Sourcing & 0–100 Audit", active=current_stage == 2, completed=current_stage > 2)
+    s3_html = render_step_chip(3, "AI Drafting & Visuals", active=current_stage == 3, completed=current_stage > 3)
+    s4_html = render_step_chip(4, "HITL Studio Approval", active=current_stage == 4, completed=False)
+
+    arrow_sep = '<span style="color: var(--apple-ink-tertiary); font-weight: bold; user-select: none;">➔</span>'
+    stepper_html = (
+        '<div style="background: var(--apple-surface-secondary); border: 1px solid var(--apple-border); '
+        'border-radius: 14px; padding: 12px 20px; margin-bottom: 22px; display: flex; gap: 10px; '
+        f'align-items: center; justify-content: space-between; flex-wrap: wrap;">'
+        f'{s1_html}{arrow_sep}{s2_html}{arrow_sep}{s3_html}{arrow_sep}{s4_html}'
+        '</div>'
+    )
+    st.markdown(stepper_html, unsafe_allow_html=True)
 
     # 1. AI Provider & API Key Quick Check
     active_provider = settings.get_active_provider()
@@ -106,6 +115,7 @@ def render_single_workflow_tab():
             )
         with col_k2:
             if st.button("💾 Save Key", use_container_width=True, type="primary", key=f"save_key_{chosen_provider}_sw"):
+                st.toast("API Key saved permanently!", icon="💾")
                 if quick_key.strip():
                     if chosen_provider == "gemini":
                         settings.save(gemini_api_key=quick_key.strip())
@@ -217,6 +227,7 @@ def render_single_workflow_tab():
             with col_sample:
                 if st.button("📋 Load Sample ASINs", use_container_width=True, key="sample_asins_btn_sw"):
                     st.session_state["sw_asins_sample"] = SAMPLE_ASINS
+                    st.toast("Loaded sample ASINs for Keychron & Logitech!", icon="📋")
                     st.rerun()
 
             manual_facts_input = None
@@ -272,6 +283,7 @@ def render_single_workflow_tab():
             with col_sample_facts:
                 if st.button("📋 Load Sample Product Facts", use_container_width=True, key="sample_facts_btn_sw"):
                     st.session_state["sw_facts_sample"] = SAMPLE_MANUAL_FACTS
+                    st.toast("Loaded sample product facts for Keychron & Logitech!", icon="📋")
                     st.rerun()
             asins_input = ""
 
@@ -362,6 +374,7 @@ def render_single_workflow_tab():
 
     # Preview & Score execution
     if preview_btn:
+        st.session_state["sw_stage"] = 2
         with st.spinner("Sourcing and scoring candidate products..."):
             if manual_facts_input:
                 preview_prods = fetch_products_hybrid([], affiliate_tag=affiliate_tag, country=country, manual_facts_text=manual_facts_input)
@@ -378,26 +391,26 @@ def render_single_workflow_tab():
                     img_check = validate_product_image_policy(p.main_image or "")
 
                     grade_badge = {
-                        "Excellent": ("rgba(52, 199, 89, 0.1)", "#15803d", "rgba(52, 199, 89, 0.3)", "🟢 Excellent"),
-                        "Good": ("rgba(0, 113, 227, 0.1)", "#0071e3", "rgba(0, 113, 227, 0.3)", "🔵 Good"),
-                        "Fair": ("rgba(255, 149, 0, 0.1)", "#b45309", "rgba(255, 149, 0, 0.3)", "🟡 Fair"),
-                        "Needs Attention": ("rgba(239, 68, 68, 0.1)", "#b91c1c", "rgba(239, 68, 68, 0.3)", "🔴 Needs Attention")
-                    }.get(score.grade, ("rgba(0,0,0,0.05)", "#64748b", "rgba(0,0,0,0.1)", score.grade))
+                        "Excellent": ("rgba(52, 199, 89, 0.1)", "var(--apple-green-dark)", "rgba(52, 199, 89, 0.3)", "🟢 Excellent"),
+                        "Good": ("rgba(0, 113, 227, 0.1)", "var(--apple-blue)", "rgba(0, 113, 227, 0.3)", "🔵 Good"),
+                        "Fair": ("rgba(255, 149, 0, 0.1)", "var(--apple-amber-deep)", "rgba(255, 149, 0, 0.3)", "🟡 Fair"),
+                        "Needs Attention": ("rgba(239, 68, 68, 0.1)", "var(--apple-red-dark)", "rgba(239, 68, 68, 0.3)", "🔴 Needs Attention")
+                    }.get(score.grade, ("var(--apple-surface-secondary)", "var(--apple-ink-secondary)", "var(--apple-border)", score.grade))
 
                     with st.expander(f"📦 {p.title[:60]}... — Score: {score.total_score}/100 ({score.grade})", expanded=True):
-                        st.markdown(f"""
-                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
-                            <span class="apple-pill-badge" style="background: {grade_badge[0]}; color: {grade_badge[1]}; border: 1px solid {grade_badge[2]}; font-size: 0.84rem; padding: 4px 12px;">
-                                {grade_badge[3]} ({score.total_score}/100)
-                            </span>
-                            <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: #0071e3; border: 1px solid rgba(0, 113, 227, 0.2);">
-                                Price: {p.price or 'N/A'}
-                            </span>
-                            <span class="apple-pill-badge" style="background: {'rgba(52, 199, 89, 0.08)' if img_check['is_compliant'] else 'rgba(239, 68, 68, 0.08)'}; color: {'#15803d' if img_check['is_compliant'] else '#b91c1c'}; border: 1px solid {'rgba(52, 199, 89, 0.2)' if img_check['is_compliant'] else 'rgba(239, 68, 68, 0.2)'};">
-                                {'✅ Amazon Asset Compliant' if img_check['is_compliant'] else '⚠️ Asset Flagged'}
-                            </span>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        comp_badge_bg = 'rgba(52, 199, 89, 0.08)' if img_check['is_compliant'] else 'rgba(239, 68, 68, 0.08)'
+                        comp_badge_fg = 'var(--apple-green-dark)' if img_check['is_compliant'] else 'var(--apple-red-dark)'
+                        comp_badge_border = 'rgba(52, 199, 89, 0.2)' if img_check['is_compliant'] else 'rgba(239, 68, 68, 0.2)'
+                        comp_badge_text = '✅ Amazon Asset Compliant' if img_check['is_compliant'] else '⚠️ Asset Flagged'
+
+                        pill_html = (
+                            '<div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">'
+                            f'<span class="apple-pill-badge" style="background: {grade_badge[0]}; color: {grade_badge[1]}; border: 1px solid {grade_badge[2]}; font-size: 0.84rem; padding: 4px 12px;">{grade_badge[3]} ({score.total_score}/100)</span>'
+                            f'<span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: var(--apple-blue); border: 1px solid rgba(0, 113, 227, 0.2);">Price: {p.price or "N/A"}</span>'
+                            f'<span class="apple-pill-badge" style="background: {comp_badge_bg}; color: {comp_badge_fg}; border: 1px solid {comp_badge_border};">{comp_badge_text}</span>'
+                            '</div>'
+                        )
+                        st.markdown(pill_html, unsafe_allow_html=True)
 
                         sc_col1, sc_col2 = st.columns([2, 1])
                         with sc_col1:
@@ -417,6 +430,7 @@ def render_single_workflow_tab():
     generate_btn = st.button("✨ Run Autopilot & Generate Draft", type="primary", use_container_width=True, key="sw_run_btn")
 
     if generate_btn:
+        st.toast("Autopilot generating draft...", icon="✨")
         active_key = (
             getattr(settings, "get_gemini_api_key", lambda: getattr(settings, "GEMINI_API_KEY", ""))() or st.session_state.get("gemini_api_key", "")
             if chosen_provider == "gemini"
@@ -478,10 +492,15 @@ def render_single_workflow_tab():
                         article_angle=pushed_angle or "",
                         quality=hero_quality
                     )
-                    if hero_res.get("success") and hero_res.get("image_url"):
-                        hero_url = hero_res["image_url"]
+                    if hero_res.get("success") and (hero_res.get("local_path") or hero_res.get("image_url")):
+                        hero_url = hero_res.get("local_path") or hero_res.get("image_url")
+                        draft.featured_image = hero_url
                         draft.content_markdown = f"![{keyword} - Editorial Guide]({hero_url})\n\n" + draft.content_markdown
-                        st.write("✅ Created and embedded Image 2.5 Flare hero graphic!")
+                        import markdown
+                        html_body = markdown.markdown(draft.content_markdown, extensions=["tables", "fenced_code", "nl2br"])
+                        draft.content_html = enforce_nofollow_sponsored(html_body)
+                        draft.quality_scorecard = audit_article_quality(draft)
+                        st.write("✅ Created and embedded Image 2.5 Flare hero graphic into Markdown, HTML, and Featured Media!")
                     elif not hero_res.get("success"):
                         st.caption(f"ℹ️ Image notice: {hero_res.get('message')}")
 
@@ -513,9 +532,20 @@ def render_single_workflow_tab():
                     set_setting("LAST_ASINS", asins_input.strip())
 
                 status.update(label=f"🎉 Successfully generated draft: '{draft.title}'!", state="complete")
+                st.session_state["sw_stage"] = 4
+                st.session_state["review_selected_draft_id"] = draft.id
                 
                 score_val = draft.quality_scorecard.total_score if draft.quality_scorecard else 95
-                st.success(f"Draft saved! (Quality Score: **{score_val}/100**). Go to the **'HITL Review Studio'** to review, adjust categories, and publish/schedule.")
+                
+                col_res1, col_res2 = st.columns([1.6, 1])
+                with col_res1:
+                    st.success(f"🎉 Successfully generated draft: **'{draft.title}'** (Quality Score: **{score_val}/100**)")
+                with col_res2:
+                    if st.button("👉 Open in HITL Review Studio ➔", type="primary", use_container_width=True, key="sw_goto_review_btn"):
+                        st.toast("Opening Review Studio...", icon="👉")
+                        st.session_state["target_nav_tab"] = "HITL Review Studio"
+                        st.session_state["review_selected_draft_id"] = draft.id
+                        st.rerun()
             except Exception as e:
                 status.update(label=f"❌ Error during generation: {e}", state="error")
                 st.error(f"Generation error: {e}")

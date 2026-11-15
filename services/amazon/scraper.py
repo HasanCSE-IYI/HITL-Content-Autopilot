@@ -194,94 +194,94 @@ def scrape_amazon_product(
     proxies = get_active_proxy()
 
     try:
-        session = requests.Session()
-        resp = session.get(url, headers=headers, proxies=proxies, timeout=14)
+        with requests.Session() as session:
+            resp = session.get(url, headers=headers, proxies=proxies, timeout=14)
 
-        # 3. Check for verification challenge
-        if is_verification_challenge(resp.text, resp.status_code):
-            logger.warning(f"Amazon requested verification for ASIN {clean_asin} (Status {resp.status_code}). Falling back gracefully.")
-            product.provenance = "Amazon Verification Notice (Link Preserved, Ready for Facts)"
-            return product
+            # 3. Check for verification challenge
+            if is_verification_challenge(resp.text, resp.status_code):
+                logger.warning(f"Amazon requested verification for ASIN {clean_asin} (Status {resp.status_code}). Falling back gracefully.")
+                product.provenance = "Amazon Verification Notice (Link Preserved, Ready for Facts)"
+                return product
 
-        if resp.status_code != 200:
-            logger.warning(f"Amazon returned status {resp.status_code} for ASIN {clean_asin}")
-            return product
+            if resp.status_code != 200:
+                logger.warning(f"Amazon returned status {resp.status_code} for ASIN {clean_asin}")
+                return product
 
-        soup = BeautifulSoup(resp.content, "html.parser")
+            soup = BeautifulSoup(resp.content, "html.parser")
 
-        # 4. Extract Title
-        title_el = soup.find(id="productTitle") or soup.find("span", {"id": "title"}) or soup.find("h1", {"id": "title"})
-        if title_el:
-            product.title = title_el.get_text(strip=True)
+            # 4. Extract Title
+            title_el = soup.find(id="productTitle") or soup.find("span", {"id": "title"}) or soup.find("h1", {"id": "title"})
+            if title_el:
+                product.title = title_el.get_text(strip=True)
 
-        # 5. Extract Price
-        price_el = (
-            soup.select_one(".a-price .a-offscreen")
-            or soup.find(id="priceblock_ourprice")
-            or soup.find(id="priceblock_dealprice")
-            or soup.select_one(".apexPriceToPay .a-offscreen")
-        )
-        if price_el:
-            price_text = price_el.get_text(strip=True)
-            if price_text:
-                product.price = price_text
+            # 5. Extract Price
+            price_el = (
+                soup.select_one(".a-price .a-offscreen")
+                or soup.find(id="priceblock_ourprice")
+                or soup.find(id="priceblock_dealprice")
+                or soup.select_one(".apexPriceToPay .a-offscreen")
+            )
+            if price_el:
+                price_text = price_el.get_text(strip=True)
+                if price_text:
+                    product.price = price_text
 
-        # 6. Extract Rating
-        rating_el = soup.select_one("#acrPopover span.a-icon-alt") or soup.select_one("span[data-hook='rating-out-of-text']")
-        if rating_el:
-            rating_match = re.search(r"(\d+(?:\.\d+)?)", rating_el.get_text(strip=True))
-            if rating_match:
-                try:
-                    product.rating = float(rating_match.group(1))
-                except ValueError:
-                    pass
+            # 6. Extract Rating
+            rating_el = soup.select_one("#acrPopover span.a-icon-alt") or soup.select_one("span[data-hook='rating-out-of-text']")
+            if rating_el:
+                rating_match = re.search(r"(\d+(?:\.\d+)?)", rating_el.get_text(strip=True))
+                if rating_match:
+                    try:
+                        product.rating = float(rating_match.group(1))
+                    except ValueError:
+                        pass
 
-        # 7. Extract Review Count
-        rev_count_el = soup.find(id="acrCustomerReviewText")
-        if rev_count_el:
-            count_match = re.search(r"([\d,]+)", rev_count_el.get_text(strip=True))
-            if count_match:
-                try:
-                    product.review_count = int(count_match.group(1).replace(",", ""))
-                except ValueError:
-                    pass
+            # 7. Extract Review Count
+            rev_count_el = soup.find(id="acrCustomerReviewText")
+            if rev_count_el:
+                count_match = re.search(r"([\d,]+)", rev_count_el.get_text(strip=True))
+                if count_match:
+                    try:
+                        product.review_count = int(count_match.group(1).replace(",", ""))
+                    except ValueError:
+                        pass
 
-        # 8. Extract Bullet Points / Specs
-        bullets = []
-        feature_div = soup.find(id="feature-bullets")
-        if feature_div:
-            for item in feature_div.select("ul li span.a-list-item"):
-                text = item.get_text(strip=True)
-                if text and not text.lower().startswith("make sure this fits"):
-                    bullets.append(text)
-        product.features = bullets[:8]
+            # 8. Extract Bullet Points / Specs
+            bullets = []
+            feature_div = soup.find(id="feature-bullets")
+            if feature_div:
+                for item in feature_div.select("ul li span.a-list-item"):
+                    text = item.get_text(strip=True)
+                    if text and not text.lower().startswith("make sure this fits"):
+                        bullets.append(text)
+            product.features = bullets[:8]
 
-        # 9. Extract High-Res Image (Authorized Amazon Asset URL)
-        img_el = soup.find(id="landingImage") or soup.find(id="imgBlkFront")
-        if img_el:
-            dynamic_data = img_el.get("data-a-dynamic-image")
-            if dynamic_data:
-                try:
-                    img_dict = json.loads(dynamic_data)
-                    sorted_images = sorted(img_dict.items(), key=lambda x: x[1][0] * x[1][1], reverse=True)
-                    if sorted_images:
-                        product.main_image = sorted_images[0][0]
-                except Exception:
-                    pass
-            if not product.main_image:
-                product.main_image = img_el.get("data-old-hires") or img_el.get("src")
+            # 9. Extract High-Res Image (Authorized Amazon Asset URL)
+            img_el = soup.find(id="landingImage") or soup.find(id="imgBlkFront")
+            if img_el:
+                dynamic_data = img_el.get("data-a-dynamic-image")
+                if dynamic_data:
+                    try:
+                        img_dict = json.loads(dynamic_data)
+                        sorted_images = sorted(img_dict.items(), key=lambda x: x[1][0] * x[1][1], reverse=True)
+                        if sorted_images:
+                            product.main_image = sorted_images[0][0]
+                    except Exception:
+                        pass
+                if not product.main_image:
+                    product.main_image = img_el.get("data-old-hires") or img_el.get("src")
 
-        if product.main_image:
-            product.main_image = product.main_image.strip()
-            if product.main_image.startswith("//"):
-                product.main_image = f"https:{product.main_image}"
+            if product.main_image:
+                product.main_image = product.main_image.strip()
+                if product.main_image.startswith("//"):
+                    product.main_image = f"https:{product.main_image}"
 
-        if bullets:
-            product.pros = bullets[:3]
+            if bullets:
+                product.pros = bullets[:3]
 
-        # 10. Cache valid product data locally for 24 hours
-        if product.title and not product.title.startswith("Amazon Product ("):
-            cache_product(product, country=country)
+            # 10. Cache valid product data locally for 24 hours
+            if product.title and not product.title.startswith("Amazon Product ("):
+                cache_product(product, country=country)
 
     except Exception as e:
         logger.error(f"Error scraping ASIN {clean_asin}: {e}")

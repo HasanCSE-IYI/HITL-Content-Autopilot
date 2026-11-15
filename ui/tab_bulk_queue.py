@@ -11,11 +11,24 @@ from core.database import (
 from services.queue.bulk_manager import start_batch_execution, is_batch_running
 from services.amazon.csv_importer import generate_bulk_keywords_csv_template, parse_bulk_keywords_csv
 
+SAMPLE_BULK_KEYWORDS = """Best Wireless Ergonomic Keyboard | B0CX23V2ZT
+Best Standing Desk Under 500
+Quiet Air Purifier for Bedroom 2026
+Best Mechanical Gaming Mouse
+Best USB-C Monitor For MacBook"""
+
 def render_bulk_queue_tab():
     st.subheader("⚡ Bulk Keyword Queue Autopilot (20–50 Keywords)")
     st.caption("Queue up 20 to 50 keywords at once with automated concurrency control, rate limiting, and background processing.")
 
     sites = list_wordpress_sites()
+
+    col_pre1, col_pre2 = st.columns([3, 1.2])
+    with col_pre2:
+        if st.button("📋 Load Sample 5-Keyword Batch", use_container_width=True, key="bulk_load_sample_btn"):
+            st.session_state["bulk_keywords_input"] = SAMPLE_BULK_KEYWORDS
+            st.toast("Loaded 5 high-intent sample keywords into Bulk Queue!", icon="📋")
+            st.rerun()
 
     # CSV Import Helper (Section 10 Compliance)
     with st.expander("📂 Import Keywords from CSV Spreadsheet", expanded=False):
@@ -141,7 +154,15 @@ def render_bulk_queue_tab():
     # 2. Batch Monitor & Live Progress
     recent_tasks = list_bulk_tasks()
     if not recent_tasks:
-        st.info("ℹ️ No bulk batches yet. Enter keywords above and launch your first batch!")
+        st.markdown("""
+        <div class="apple-card-elevated" style="text-align: center; padding: 36px 20px; margin-top: 14px;">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">⚡</div>
+            <div style="font-weight: 700; font-size: 1.15rem; color: var(--apple-ink-primary); margin-bottom: 6px;">No Bulk Batches Queued Yet</div>
+            <div style="font-size: 0.88rem; color: var(--apple-ink-secondary); max-width: 520px; margin: 0 auto;">
+                Paste 10 to 50 keywords above (or click <strong>Load Sample 5-Keyword Batch</strong>) to batch-generate Amazon affiliate articles with automated background workers, controlled concurrency, and polite delay pacing.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
     # Find unique batches
@@ -166,25 +187,26 @@ def render_bulk_queue_tab():
         summary = get_batch_summary(batch_id)
         running_state = is_batch_running(batch_id)
         status_label = "Active (Processing)" if running_state else "Completed / Idle"
-        beacon_color = "#34c759" if running_state else "#94a3b8"
+        beacon_color = "var(--apple-green)" if running_state else "var(--apple-slate)"
 
-        st.markdown(f"""
-        <div style="background: #ffffff; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px 20px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="apple-beacon-dot" style="background: {beacon_color};"></span>
-                    <span style="font-weight: 700; font-size: 0.98rem; color: #1d1d1f;">Batch: <code>{batch_id}</code></span>
-                    <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.1)' if running_state else 'rgba(0,0,0,0.05)'}; color: {'#15803d' if running_state else '#64748b'}; border: 1px solid {'rgba(52,199,89,0.2)' if running_state else 'rgba(0,0,0,0.08)'};">
-                        {status_label}
-                    </span>
-                    <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: #0071e3; border: 1px solid rgba(0, 113, 227, 0.2);">
-                        ⚡ Live Reactivity: 3s
-                    </span>
-                </div>
-                <span style="font-size: 0.92rem; font-weight: 700; color: #0071e3;">{summary['percent_complete']}% Complete ({summary['completed']}/{summary['total']} items)</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        running_pill_bg = 'rgba(52,199,89,0.1)' if running_state else 'var(--apple-surface-secondary)'
+        running_pill_fg = 'var(--apple-green-dark)' if running_state else 'var(--apple-ink-secondary)'
+        running_pill_border = 'rgba(52,199,89,0.2)' if running_state else 'var(--apple-border)'
+
+        batch_card_html = (
+            '<div style="background: var(--apple-surface-card); border: 1px solid var(--apple-border); border-radius: 14px; padding: 14px 20px; margin-bottom: 12px; box-shadow: var(--apple-shadow-sm);">'
+            '<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">'
+            '<div style="display: flex; align-items: center; gap: 8px;">'
+            f'<span class="apple-beacon-dot" style="background: {beacon_color};"></span>'
+            f'<span style="font-weight: 700; font-size: 0.98rem; color: var(--apple-ink-primary);">Batch: <code>{batch_id}</code></span>'
+            f'<span class="apple-pill-badge" style="background: {running_pill_bg}; color: {running_pill_fg}; border: 1px solid {running_pill_border};">{status_label}</span>'
+            '<span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.08); color: var(--apple-blue); border: 1px solid rgba(0, 113, 227, 0.2);">⚡ Live Reactivity: 3s</span>'
+            '</div>'
+            f'<span style="font-size: 0.92rem; font-weight: 700; color: var(--apple-blue);">{summary["percent_complete"]}% Complete ({summary["completed"]}/{summary["total"]} items)</span>'
+            '</div>'
+            '</div>'
+        )
+        st.markdown(batch_card_html, unsafe_allow_html=True)
 
         st.progress(summary["percent_complete"] / 100.0)
 
@@ -214,18 +236,23 @@ def render_bulk_queue_tab():
                     st.caption(f"Format: `{t.article_type}`")
                 with col_t3:
                     if t.status == BulkTaskStatus.COMPLETED:
-                        st.markdown("""<span class="apple-pill-badge" style="background: rgba(52,199,89,0.1); color: #166534; border: 1px solid rgba(52,199,89,0.25);">🟢 Completed</span>""", unsafe_allow_html=True)
+                        st.markdown("""<span class="apple-pill-badge" style="background: rgba(52,199,89,0.1); color: var(--apple-green-deep); border: 1px solid rgba(52,199,89,0.25);">🟢 Completed</span>""", unsafe_allow_html=True)
                     elif t.status == BulkTaskStatus.PROCESSING:
-                        st.markdown(f"""<span class="apple-pill-badge" style="background: rgba(0,113,227,0.1); color: #0071e3; border: 1px solid rgba(0,113,227,0.25);">🔵 Running ({t.progress}%)</span>""", unsafe_allow_html=True)
+                        st.markdown(f"""<span class="apple-pill-badge" style="background: rgba(0,113,227,0.1); color: var(--apple-blue); border: 1px solid rgba(0,113,227,0.25);">🔵 Running ({t.progress}%)</span>""", unsafe_allow_html=True)
                     elif t.status == BulkTaskStatus.FAILED:
-                        st.markdown("""<span class="apple-pill-badge" style="background: rgba(239,68,68,0.1); color: #991b1b; border: 1px solid rgba(239,68,68,0.25);">❌ Failed</span>""", unsafe_allow_html=True)
+                        st.markdown("""<span class="apple-pill-badge" style="background: rgba(239,68,68,0.1); color: var(--apple-red-deep); border: 1px solid rgba(239,68,68,0.25);">❌ Failed</span>""", unsafe_allow_html=True)
                     else:
-                        st.markdown("""<span class="apple-pill-badge" style="background: rgba(0,0,0,0.05); color: #64748b; border: 1px solid rgba(0,0,0,0.1);">⏳ Pending</span>""", unsafe_allow_html=True)
+                        st.markdown("""<span class="apple-pill-badge" style="background: var(--apple-surface-secondary); color: var(--apple-ink-secondary); border: 1px solid var(--apple-border);">⏳ Pending</span>""", unsafe_allow_html=True)
                 with col_t4:
                     if t.draft_id:
                         st.caption(f"Draft ID: `{t.draft_id}`")
                     elif t.error_message:
-                        st.caption(f"⚠️ {t.error_message[:60]}")
+                        st.caption(f"⚠️ {t.error_message[:45]}")
+                        if st.button("🔁 Retry", key=f"inline_retry_{t.id}", use_container_width=True):
+                            from core.database import update_bulk_task
+                            update_bulk_task(t.id, status=BulkTaskStatus.PENDING, progress=0, error_message="")
+                            st.toast(f"Reset '{t.keyword[:25]}' to Pending for retry!", icon="🔄")
+                            st.rerun()
 
     render_live_batch_monitor(selected_batch)
 

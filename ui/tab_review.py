@@ -61,10 +61,15 @@ def render_review_tab():
 
     with col_f3:
         draft_options = {d.id: f"[{d.id}] {d.title[:55]}... ({STATUS_COLORS.get(d.status, d.status)})" for d in drafts}
+        preselected_id = st.session_state.pop("review_selected_draft_id", None)
+        default_idx = 0
+        if preselected_id and preselected_id in list(draft_options.keys()):
+            default_idx = list(draft_options.keys()).index(preselected_id)
         selected_id = st.selectbox(
             "Select Article to Review",
             options=list(draft_options.keys()),
-            format_func=lambda x: draft_options[x]
+            format_func=lambda x: draft_options[x],
+            index=default_idx
         )
 
     draft = get_draft(selected_id)
@@ -83,36 +88,50 @@ def render_review_tab():
 
     # 2. Quality Scorecard Bento Strip
     score = scorecard.total_score
-    score_fg = "#15803d" if score >= 85 else ("#b45309" if score >= 70 else "#b91c1c")
+    score_fg = "var(--apple-green-dark)" if score >= 85 else ("var(--apple-amber-deep)" if score >= 70 else "var(--apple-red-dark)")
     site_name = sites_map[draft.wp_site_id].name if draft.wp_site_id in sites_map else "No target site configured"
 
-    st.markdown(f"""
-    <div style="background: #ffffff; border: 1px solid rgba(0,0,0,0.08); border-radius: 16px; padding: 18px 22px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
-            <div style="display: flex; align-items: center; gap: 14px;">
-                <div style="font-size: 2.2rem; font-weight: 800; color: {score_fg}; letter-spacing: -0.03em;">{score}<span style="font-size: 1.1rem; color: #86868b; font-weight: 500;">/100</span></div>
-                <div>
-                    <div style="font-weight: 700; font-size: 1.0rem; color: #1d1d1f; letter-spacing: -0.01em;">Audited Quality Score</div>
-                    <div style="font-size: 0.82rem; color: #86868b;">{scorecard.word_count} words • Target: <strong>{site_name}</strong> • Status: <strong>{STATUS_COLORS.get(draft.status, draft.status)}</strong></div>
-                </div>
-            </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.09)' if scorecard.has_ftc_disclosure else 'rgba(239,68,68,0.09)'}; color: {'#15803d' if scorecard.has_ftc_disclosure else '#b91c1c'}; border: 1px solid {'rgba(52,199,89,0.25)' if scorecard.has_ftc_disclosure else 'rgba(239,68,68,0.25)'};">
-                    FTC: {'✅ Present' if scorecard.has_ftc_disclosure else '❌ Missing'}
-                </span>
-                <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.09)' if scorecard.has_price_disclaimer else 'rgba(239,68,68,0.09)'}; color: {'#15803d' if scorecard.has_price_disclaimer else '#b91c1c'}; border: 1px solid {'rgba(52,199,89,0.25)' if scorecard.has_price_disclaimer else 'rgba(239,68,68,0.25)'};">
-                    Price Disclaimer: {'✅ Present' if scorecard.has_price_disclaimer else '❌ Missing'}
-                </span>
-                <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.09)' if scorecard.has_schema_markup else 'rgba(239,68,68,0.09)'}; color: {'#15803d' if scorecard.has_schema_markup else '#b91c1c'}; border: 1px solid {'rgba(52,199,89,0.25)' if scorecard.has_schema_markup else 'rgba(239,68,68,0.25)'};">
-                    Schema JSON-LD: {'✅ Valid' if scorecard.has_schema_markup else '❌ Missing'}
-                </span>
-                <span class="apple-pill-badge" style="background: {'rgba(52,199,89,0.09)' if scorecard.has_comparison_table else 'rgba(0,0,0,0.04)'}; color: {'#15803d' if scorecard.has_comparison_table else '#64748b'}; border: 1px solid {'rgba(52,199,89,0.25)' if scorecard.has_comparison_table else 'rgba(0,0,0,0.08)'};">
-                    Table: {'✅ Rendered' if scorecard.has_comparison_table else '—'}
-                </span>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    ftc_bg = 'rgba(52,199,89,0.09)' if scorecard.has_ftc_disclosure else 'rgba(239,68,68,0.09)'
+    ftc_fg = 'var(--apple-green-dark)' if scorecard.has_ftc_disclosure else 'var(--apple-red-dark)'
+    ftc_border = 'rgba(52,199,89,0.25)' if scorecard.has_ftc_disclosure else 'rgba(239,68,68,0.25)'
+    ftc_txt = '✅ Present' if scorecard.has_ftc_disclosure else '❌ Missing'
+
+    price_bg = 'rgba(52,199,89,0.09)' if scorecard.has_price_disclaimer else 'rgba(239,68,68,0.09)'
+    price_fg = 'var(--apple-green-dark)' if scorecard.has_price_disclaimer else 'var(--apple-red-dark)'
+    price_border = 'rgba(52,199,89,0.25)' if scorecard.has_price_disclaimer else 'rgba(239,68,68,0.25)'
+    price_txt = '✅ Present' if scorecard.has_price_disclaimer else '❌ Missing'
+
+    schema_bg = 'rgba(52,199,89,0.09)' if scorecard.has_schema_markup else 'rgba(239,68,68,0.09)'
+    schema_fg = 'var(--apple-green-dark)' if scorecard.has_schema_markup else 'var(--apple-red-dark)'
+    schema_border = 'rgba(52,199,89,0.25)' if scorecard.has_schema_markup else 'rgba(239,68,68,0.25)'
+    schema_txt = '✅ Valid' if scorecard.has_schema_markup else '❌ Missing'
+
+    tbl_bg = 'rgba(52,199,89,0.09)' if scorecard.has_comparison_table else 'var(--apple-surface-secondary)'
+    tbl_fg = 'var(--apple-green-dark)' if scorecard.has_comparison_table else 'var(--apple-ink-secondary)'
+    tbl_border = 'rgba(52,199,89,0.25)' if scorecard.has_comparison_table else 'var(--apple-border)'
+    tbl_txt = '✅ Rendered' if scorecard.has_comparison_table else '—'
+
+    scorecard_strip_html = (
+        '<div style="background: var(--apple-surface-card); border: 1px solid var(--apple-border); border-radius: 16px; padding: 18px 22px; box-shadow: var(--apple-shadow-sm); margin-bottom: 12px;">'
+        '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">'
+        '<div style="display: flex; align-items: center; gap: 14px;">'
+        f'<div style="font-size: 2.2rem; font-weight: 800; color: {score_fg}; letter-spacing: -0.03em;">{score}<span style="font-size: 1.1rem; color: var(--apple-ink-tertiary); font-weight: 500;">/100</span></div>'
+        '<div>'
+        '<div style="font-weight: 700; font-size: 1.0rem; color: var(--apple-ink-primary); letter-spacing: -0.01em;">Audited Quality Score</div>'
+        f'<div style="font-size: 0.82rem; color: var(--apple-ink-secondary);">{scorecard.word_count} words • Target: <strong>{site_name}</strong> • Status: <strong>{STATUS_COLORS.get(draft.status, draft.status)}</strong></div>'
+        '</div>'
+        '</div>'
+        '<div style="display: flex; gap: 8px; flex-wrap: wrap;">'
+        f'<span class="apple-pill-badge" style="background: {ftc_bg}; color: {ftc_fg}; border: 1px solid {ftc_border};">FTC: {ftc_txt}</span>'
+        f'<span class="apple-pill-badge" style="background: {price_bg}; color: {price_fg}; border: 1px solid {price_border};">Price Disclaimer: {price_txt}</span>'
+        f'<span class="apple-pill-badge" style="background: {schema_bg}; color: {schema_fg}; border: 1px solid {schema_border};">Schema JSON-LD: {schema_txt}</span>'
+        f'<span class="apple-pill-badge" style="background: {tbl_bg}; color: {tbl_fg}; border: 1px solid {tbl_border};">Table: {tbl_txt}</span>'
+        '</div>'
+        '</div>'
+        '</div>'
+    )
+    st.markdown(scorecard_strip_html, unsafe_allow_html=True)
+    st.progress(score / 100.0)
 
     # Quality details expander
     with st.expander(f"🛡️ Quality & Policy Audit Report ({score}/100)", expanded=score < 80):
@@ -191,14 +210,15 @@ def render_review_tab():
                 if prod.main_image:
                     render_safe_image(prod.main_image, use_container_width=True)
                 
-                st.markdown(f"""
-                <div style="display: flex; gap: 8px; align-items: center; margin: 8px 0;">
-                    <span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.09); color: #0071e3; font-weight: 700; border: 1px solid rgba(0, 113, 227, 0.2);">
-                        {prod.price or 'Price N/A'}
-                    </span>
-                    <span style="font-size: 0.8rem; color: #86868b;">ASIN: <code>{prod.asin}</code></span>
-                </div>
-                """, unsafe_allow_html=True)
+                prod_pill_html = (
+                    '<div style="display: flex; gap: 8px; align-items: center; margin: 8px 0;">'
+                    '<span class="apple-pill-badge" style="background: rgba(0, 113, 227, 0.09); color: var(--apple-blue); font-weight: 700; border: 1px solid rgba(0, 113, 227, 0.2);">'
+                    f'{prod.price or "Price N/A"}'
+                    '</span>'
+                    f'<span style="font-size: 0.8rem; color: var(--apple-ink-tertiary);">ASIN: <code>{prod.asin}</code></span>'
+                    '</div>'
+                )
+                st.markdown(prod_pill_html, unsafe_allow_html=True)
                 
                 st.caption(f"Source: `{prod.provenance or 'Amazon Safe Scraper'}`")
                 if prod.rating:
@@ -236,7 +256,11 @@ def render_review_tab():
             )
 
         with tab_html:
-            st.code(draft.schema_json_ld, language="html")
+            sub_tab_schema, sub_tab_clean_html = st.tabs(["📜 Schema JSON-LD", "🌐 Clean Compiled HTML"])
+            with sub_tab_schema:
+                st.code(draft.schema_json_ld or "<!-- No schema generated -->", language="html")
+            with sub_tab_clean_html:
+                st.code(draft.content_html or "<!-- No compiled HTML available -->", language="html")
 
         # AI Section Regenerator
         active_provider = getattr(settings, "get_active_provider", lambda: getattr(settings, "AI_PROVIDER", "openai"))()
@@ -250,21 +274,26 @@ def render_review_tab():
             with p_col1:
                 if st.button("✨ Polish Tone", key="p_btn_tone", use_container_width=True):
                     st.session_state["regen_preset_val"] = "Make the tone authoritative, engaging, and flow naturally with seamless transitions."
+                    st.toast("Preset loaded: Polish Tone", icon="✨")
             with p_col2:
                 if st.button("⚖️ Add Specs/Data", key="p_btn_comp", use_container_width=True):
                     st.session_state["regen_preset_val"] = "Add concrete comparison metrics, technical specs context, and value analysis."
+                    st.toast("Preset loaded: Add Specs & Data", icon="⚖️")
             with p_col3:
                 if st.button("🔍 Expand Cons/Tradeoffs", key="p_btn_cons", use_container_width=True):
                     st.session_state["regen_preset_val"] = "Expand on real-world testing observations, ergonomic trade-offs, and critical drawbacks."
+                    st.toast("Preset loaded: Expand Cons", icon="🔍")
             with p_col4:
                 if st.button("⚡ Make Punchy", key="p_btn_conc", use_container_width=True):
                     st.session_state["regen_preset_val"] = "Tighten the prose, remove fluff, and make it crisp and skimmable for mobile readers."
+                    st.toast("Preset loaded: Make Punchy", icon="⚡")
 
             default_inst = st.session_state.get("regen_preset_val", "")
             regen_input = st.text_area("Section Text to Rewrite", placeholder="Paste section here...", key="regen_text_rev", height=110)
             regen_inst = st.text_input("Instruction / Focus", value=default_inst, placeholder="e.g. Polish tone, add comparison points...", key="regen_inst_rev")
             
             if st.button(f"✨ Regenerate Section with {active_model_name}", key="regen_btn_rev", type="primary"):
+                st.toast(f"Regenerating section with {active_model_name}...", icon="🪄")
                 if not regen_input.strip() or not regen_inst.strip():
                     st.warning("Please provide both the section text and an instruction.")
                 else:
@@ -317,11 +346,11 @@ def render_review_tab():
         <div class="apple-action-dock">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="apple-beacon-dot" style="background: #0071e3;"></span>
-                    <span style="font-weight: 700; font-size: 0.95rem; color: #1d1d1f; letter-spacing: -0.01em;">⚡ Editorial Execution & Publishing Dock</span>
+                    <span class="apple-beacon-dot" style="background: var(--apple-blue);"></span>
+                    <span style="font-weight: 700; font-size: 0.95rem; color: var(--apple-ink-primary); letter-spacing: -0.01em;">⚡ Editorial Execution & Publishing Dock</span>
                 </div>
-                <div style="font-size: 0.8rem; color: #86868b;">
-                    Current Status: <strong style="color: #1d1d1f;">{STATUS_COLORS.get(draft.status, draft.status)}</strong>
+                <div style="font-size: 0.8rem; color: var(--apple-ink-tertiary);">
+                    Current Status: <strong style="color: var(--apple-ink-primary);">{STATUS_COLORS.get(draft.status, draft.status)}</strong>
                 </div>
             </div>
         </div>
@@ -341,6 +370,7 @@ def render_review_tab():
                 # Re-audit
                 draft.quality_scorecard = audit_article_quality(draft)
                 save_draft(draft)
+                st.toast("✅ Changes saved & quality re-audited!", icon="💾")
                 st.success("✅ Changes saved & quality re-audited!")
                 st.rerun()
             st.caption("💾 Re-audits & saves edits")
@@ -348,6 +378,7 @@ def render_review_tab():
         with act_col2:
             if st.button("✅ Approve Draft", use_container_width=True):
                 update_draft_status(draft.id, ArticleStatus.APPROVED)
+                st.toast(f"✅ Draft '{draft.id}' Approved for publishing!", icon="🎉")
                 st.success("Draft Approved! Ready for publishing.")
                 st.rerun()
             st.caption("✅ Signs off quality for queue")
@@ -375,6 +406,7 @@ def render_review_tab():
                                 scheduled_at=res.get("scheduled_at")
                             )
                             st.balloons()
+                            st.toast(f"🎉 Post scheduled on {target_site.name} for {draft.scheduled_at}!", icon="📅")
                             st.success(f"🎉 Post scheduled on {target_site.name} for {draft.scheduled_at}!")
                             st.rerun()
                         else:
@@ -402,6 +434,7 @@ def render_review_tab():
                                 published_url=res.get("link")
                             )
                             st.balloons()
+                            st.toast(f"🎉 Published live on {target_site.name} (Post #{res.get('post_id')})!", icon="🚀")
                             st.success(f"🎉 Published live! (Post ID: {res.get('post_id')})")
                             st.rerun()
                         else:

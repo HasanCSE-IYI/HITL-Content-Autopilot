@@ -78,3 +78,31 @@ def test_keyword_analyst_uses_factory_client_by_default(monkeypatch):
     assert result.keyword == "standing desk converter"
     assert result.search_intent == "Commercial Investigation"
     mock_factory_client.is_configured.assert_called_once()
+
+def test_keyword_analyst_resilient_key_parsing():
+    mock_client = MagicMock()
+    mock_client.is_configured.return_value = True
+    # LLM returns varied key abbreviations
+    mock_client.generate_json.return_value = {
+        "search_intent": "Transactional",
+        "intent_explanation": "Ready to buy.",
+        "related_queries": ["buy wireless keyboard"],
+        "user_questions": [
+            {"q": "Is mechanical better for typing?", "a": "Yes, tactile feedback improves speed."},
+            {"question": "How long do switches last?", "focal": "50 to 100 million keystrokes."}
+        ],
+        "editorial_angles": [
+            {"angle": "The Budget Pick", "audience": "Students", "focus": "Under $50 mechanical boards"}
+        ],
+        "recommended_article_type": "roundup"
+    }
+
+    result = analyze_keyword("best mechanical keyboard", client=mock_client)
+    assert result.search_intent == "Transactional"
+    assert len(result.user_questions) == 2
+    assert result.user_questions[0].question == "Is mechanical better for typing?"
+    assert result.user_questions[0].focal_answer_point == "Yes, tactile feedback improves speed."
+    assert result.user_questions[1].question == "How long do switches last?"
+    assert len(result.editorial_angles) == 1
+    assert result.editorial_angles[0].name == "The Budget Pick"
+    assert result.editorial_angles[0].target_audience == "Students"

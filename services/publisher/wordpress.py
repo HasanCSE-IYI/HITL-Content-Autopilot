@@ -211,18 +211,22 @@ class WordPressPublisher:
         if not self.is_configured():
             return {"success": False, "message": "WordPress configuration missing."}
 
-        # 1. Upload featured image if available
+        # 1. Upload featured image if available (supports Hero graphics or primary product image)
         featured_media_id = None
-        if draft.products and draft.products[0].main_image:
+        img_source = getattr(draft, "featured_image", None) or (draft.products[0].main_image if draft.products and draft.products[0].main_image else None)
+        if img_source:
             featured_media_id = self.upload_featured_image(
-                draft.products[0].main_image,
+                img_source,
                 draft.title
             )
 
-        # 2. Prepare HTML content + Schema
-        full_content = draft.content_html
+        # 2. Prepare HTML content + Schema (Defensive handling for None/empty content)
+        full_content = draft.content_html or ""
+        if not full_content and draft.content_markdown:
+            import markdown
+            full_content = markdown.markdown(draft.content_markdown, extensions=["tables", "fenced_code", "nl2br"])
         if draft.schema_json_ld:
-            full_content += f"\n\n{draft.schema_json_ld}"
+            full_content = f"{full_content}\n\n{draft.schema_json_ld}".strip()
 
         # 3. Determine publish status & scheduled date
         final_status = status
