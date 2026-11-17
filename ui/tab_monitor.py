@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
-from core.models import ArticleDraft, BulkTask, BulkTaskStatus
+from core.models import ArticleDraft, BulkTask, BulkTaskStatus, ArticleStatus
 from core.database import (
     list_drafts,
     list_bulk_tasks,
@@ -25,16 +25,16 @@ def _calculate_age_days(date_str: Optional[str]) -> int:
         return 0
 
 def render_monitor_tab():
-    st.markdown("### 📈 Monitor & Freshness Alerts Dashboard")
+    st.subheader("📈 Monitor & Freshness Alerts Dashboard")
     st.caption("Track live WordPress post statuses, monitor 30/60/90-day content freshness for Amazon compliance, and audit task errors with 1-click retry.")
 
     drafts: List[ArticleDraft] = list_drafts()
     bulk_tasks: List[BulkTask] = list_bulk_tasks()
     sites = {s.id: s.name for s in list_wordpress_sites() if s.id}
 
-    published_drafts = [d for d in drafts if d.status == "published"]
-    scheduled_drafts = [d for d in drafts if d.status == "future" or d.scheduled_at]
-    in_review_drafts = [d for d in drafts if d.status in ("draft", "pending_review")]
+    published_drafts = [d for d in drafts if d.status in ("published", "publish", ArticleStatus.PUBLISHED)]
+    scheduled_drafts = [d for d in drafts if d.status in ("future", "scheduled", ArticleStatus.SCHEDULED)]
+    in_review_drafts = [d for d in drafts if d.status in ("needs_review", "draft", "pending_review", ArticleStatus.NEEDS_REVIEW, ArticleStatus.DRAFT)]
 
     # Freshness Auditing
     fresh_count = 0
@@ -100,7 +100,7 @@ def render_monitor_tab():
             "must remain accurate. Amazon prices fluctuate; articles older than 60–90 days should be verified or refreshed."
         )
 
-        alert_col1, alert_col2, alert_col3 = st.columns(3)
+        alert_col1, alert_col2, alert_col3 = st.columns(3, vertical_alignment="top")
         with alert_col1:
             st.markdown(
                 '<div style="background: rgba(255, 149, 0, 0.08); border: 1px solid rgba(255, 149, 0, 0.25); border-radius: 12px; padding: 12px 16px; text-align: center;">'
@@ -138,7 +138,7 @@ def render_monitor_tab():
                         st.markdown(f"**Live Article:** [{d.published_url}]({d.published_url})")
                     st.markdown(f"**Products Reviewed:** {len(d.products)} products")
 
-                    col_act1, col_act2, col_act3 = st.columns([2, 1, 1.2])
+                    col_act1, col_act2, col_act3 = st.columns([2, 1, 1.2], vertical_alignment="center")
                     with col_act1:
                         st.info("💡 **Recommended Action:** Review product stock and current pricing on Amazon to ensure links remain compliant.")
                     with col_act2:
@@ -162,7 +162,20 @@ def render_monitor_tab():
         active_posts = published_drafts + scheduled_drafts
 
         if not active_posts:
-            st.info("No published or scheduled posts found in the local database. Publish articles from the 'HITL Review Studio' tab.")
+            st.markdown("""
+            <div class="apple-card-elevated" style="text-align: center; padding: 36px 20px; margin-top: 12px; max-width: 620px; margin-left: auto; margin-right: auto;">
+                <div style="font-size: 2.2rem; margin-bottom: 8px;">🌐</div>
+                <div style="font-weight: 700; font-size: 1.12rem; color: var(--apple-ink-primary); margin-bottom: 6px;">No Published or Scheduled Posts Yet</div>
+                <div style="font-size: 0.88rem; color: var(--apple-ink-secondary); margin-bottom: 16px;">
+                    Once you approve and publish or schedule articles in the HITL Review Studio, their live status, schedule dates, and direct WordPress links will appear here.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            col_m_es, _ = st.columns([1.5, 2], vertical_alignment="center")
+            with col_m_es:
+                if st.button("📝 Open HITL Review ➔", type="primary", use_container_width=True, key="mon_goto_review_btn"):
+                    st.session_state["target_nav_tab"] = "HITL Review"
+                    st.rerun()
         else:
             for post in active_posts:
                 site_name = sites.get(post.wp_site_id, "Connected Site")
@@ -212,7 +225,16 @@ def render_monitor_tab():
         if not failed_tasks:
             st.success("✅ No task failures recorded in the audit log!")
         else:
-            st.error(f"Found {len(failed_tasks)} failed task(s) requiring review or retry.")
+            col_err_h1, col_err_h2 = st.columns([3, 1.2], vertical_alignment="center")
+            with col_err_h1:
+                st.error(f"Found {len(failed_tasks)} failed task(s) requiring review or retry.")
+            with col_err_h2:
+                if st.button(f"🔁 Retry All ({len(failed_tasks)})", type="primary", use_container_width=True, key="btn_retry_all_tasks"):
+                    for ft in failed_tasks:
+                        update_bulk_task(ft.id, status=BulkTaskStatus.PENDING, progress=0, error_message="")
+                    st.toast(f"Reset {len(failed_tasks)} tasks to Pending!", icon="🔁")
+                    st.rerun()
+
             for task in failed_tasks:
                 with st.expander(f"❌ Failed: Keyword '{task.keyword}' (Batch: {task.batch_id})", expanded=True):
                     st.markdown(f"**Task ID:** `{task.id}`")
@@ -220,7 +242,7 @@ def render_monitor_tab():
                     st.markdown(f"**Error Message:**")
                     st.code(task.error_message or "Unknown exception occurred during processing.", language="text")
 
-                    col_r1, col_r2 = st.columns([1, 4])
+                    col_r1, col_r2 = st.columns([1, 4], vertical_alignment="center")
                     with col_r1:
                         if st.button("🔁 Retry Task", key=f"retry_{task.id}", type="primary"):
                             st.toast("Task retry initiated!", icon="🔁")
@@ -249,3 +271,4 @@ def render_monitor_tab():
             "in the **Settings** tab. In the meantime, link clicks and impressions can be monitored directly inside the "
             "Amazon Associates Central portal using your configured Tracking Tag."
         )
+        st.link_button("🔗 Open Amazon Associates Central Portal ↗", "https://affiliate-program.amazon.com", use_container_width=True)

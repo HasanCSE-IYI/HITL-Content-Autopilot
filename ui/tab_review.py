@@ -35,7 +35,7 @@ def render_review_tab():
     sites_map = {s.id: s for s in sites}
 
     # 1. Filters
-    col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
+    col_f1, col_f2, col_f3 = st.columns([1, 1, 2], vertical_alignment="bottom")
     with col_f1:
         site_filter_opts = {"all": "All WordPress Sites"}
         for s in sites:
@@ -56,21 +56,54 @@ def render_review_tab():
 
     drafts = list_drafts(status=status_filter, wp_site_id=filter_site_id)
     if not drafts:
-        st.info("ℹ️ No drafts found matching this filter.")
+        st.markdown("""
+        <div class="apple-card-elevated" style="text-align: center; padding: 42px 24px; margin-top: 18px; max-width: 680px; margin-left: auto; margin-right: auto;">
+            <div style="font-size: 2.6rem; margin-bottom: 10px;">📝</div>
+            <div style="font-weight: 800; font-size: 1.25rem; color: var(--apple-ink-primary); margin-bottom: 8px; letter-spacing: -0.02em;">Review Queue is Empty</div>
+            <div style="font-size: 0.92rem; color: var(--apple-ink-secondary); line-height: 1.55; margin-bottom: 20px;">
+                No article drafts match your current filter. You can generate a single affiliate guide with automated product scoring or launch a 20–50 keyword bulk queue batch.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        col_es1, col_es2, _ = st.columns([1.5, 1.5, 1], vertical_alignment="center")
+        with col_es1:
+            if st.button("🚀 Go to Single Workflow ➔", type="primary", use_container_width=True, key="rq_empty_goto_sw"):
+                st.session_state["target_nav_tab"] = "Single Workflow"
+                st.rerun()
+        with col_es2:
+            if st.button("⚡ Go to Bulk Queue ➔", use_container_width=True, key="rq_empty_goto_bq"):
+                st.session_state["target_nav_tab"] = "Bulk Queue"
+                st.rerun()
         return
 
     with col_f3:
         draft_options = {d.id: f"[{d.id}] {d.title[:55]}... ({STATUS_COLORS.get(d.status, d.status)})" for d in drafts}
+        draft_keys = list(draft_options.keys())
         preselected_id = st.session_state.pop("review_selected_draft_id", None)
         default_idx = 0
-        if preselected_id and preselected_id in list(draft_options.keys()):
-            default_idx = list(draft_options.keys()).index(preselected_id)
-        selected_id = st.selectbox(
-            "Select Article to Review",
-            options=list(draft_options.keys()),
-            format_func=lambda x: draft_options[x],
-            index=default_idx
-        )
+        if preselected_id and preselected_id in draft_keys:
+            default_idx = draft_keys.index(preselected_id)
+
+        col_nav_prev, col_sel, col_nav_next = st.columns([0.65, 2.7, 0.65], vertical_alignment="bottom")
+        with col_nav_prev:
+            prev_disabled = (default_idx <= 0)
+            if st.button("⏮️ Prev", disabled=prev_disabled, use_container_width=True, key="btn_prev_draft", help="Navigate to previous draft in queue"):
+                st.session_state["review_selected_draft_id"] = draft_keys[default_idx - 1]
+                st.rerun()
+
+        with col_sel:
+            selected_id = st.selectbox(
+                f"Article to Review ({default_idx + 1} of {len(draft_keys)})",
+                options=draft_keys,
+                format_func=lambda x: draft_options[x],
+                index=default_idx
+            )
+
+        with col_nav_next:
+            next_disabled = (default_idx >= len(draft_keys) - 1)
+            if st.button("Next ⏭️", disabled=next_disabled, use_container_width=True, key="btn_next_draft", help="Navigate to next draft in queue"):
+                st.session_state["review_selected_draft_id"] = draft_keys[default_idx + 1]
+                st.rerun()
 
     draft = get_draft(selected_id)
     if not draft:
@@ -135,7 +168,7 @@ def render_review_tab():
 
     # Quality details expander
     with st.expander(f"🛡️ Quality & Policy Audit Report ({score}/100)", expanded=score < 80):
-        qc1, qc2, qc3 = st.columns(3)
+        qc1, qc2, qc3 = st.columns(3, vertical_alignment="top")
         with qc1:
             st.markdown(f"**FTC Disclosure:** {'✅ Present' if scorecard.has_ftc_disclosure else '❌ Missing'}")
             st.markdown(f"**Price Disclaimer:** {'✅ Present' if scorecard.has_price_disclaimer else '❌ Missing'}")
@@ -149,13 +182,30 @@ def render_review_tab():
         if scorecard.issues:
             st.warning("**Actionable Recommendations:**\n" + "\n".join([f"- {iss}" for iss in scorecard.issues]))
 
+        if not scorecard.has_ftc_disclosure or not scorecard.has_price_disclaimer:
+            col_fix1, col_fix2 = st.columns([2.5, 1.2], vertical_alignment="center")
+            with col_fix1:
+                st.info("💡 **Compliance Gap Detected:** Article is missing FTC disclosure or Amazon price disclaimer.")
+            with col_fix2:
+                if st.button("⚡ Auto-Inject Disclosures", type="primary", use_container_width=True, key=f"btn_autofix_comp_{draft.id}"):
+                    from services.compliance.rules import inject_compliance_markdown
+                    draft.content_markdown = inject_compliance_markdown(draft.content_markdown)
+                    html_body = markdown.markdown(draft.content_markdown, extensions=["tables", "fenced_code", "nl2br"])
+                    draft.content_html = enforce_nofollow_sponsored(html_body)
+                    draft.quality_scorecard = audit_article_quality(draft)
+                    save_draft(draft)
+                    st.session_state[f"editor_md_input_{draft.id}"] = draft.content_markdown
+                    st.toast("✅ Injected FTC & price disclaimers! Score re-audited.", icon="⚡")
+                    st.success("✅ Compliance disclosures injected successfully!")
+                    st.rerun()
+
     st.markdown("---")
 
     # 3. Taxonomy & Scheduling Controls
     target_site = sites_map.get(draft.wp_site_id) if draft.wp_site_id else None
     
     with st.expander("🏷️ Category, Tags & Scheduling Options", expanded=True):
-        col_c1, col_c2, col_c3 = st.columns(3)
+        col_c1, col_c2, col_c3 = st.columns(3, vertical_alignment="top")
         with col_c1:
             if target_site and target_site.categories:
                 cat_dict = {c["id"]: c["name"] for c in target_site.categories}
@@ -192,11 +242,49 @@ def render_review_tab():
 
         with col_c3:
             st.markdown("**Scheduling:**")
-            now_dt = datetime.now()
-            schedule_date = st.date_input("Scheduled Date", value=now_dt.date() + timedelta(days=1))
-            schedule_time = st.time_input("Scheduled Time", value=now_dt.time())
+            default_date = None
+            default_time = None
+            if draft.scheduled_at:
+                try:
+                    parsed_dt = datetime.fromisoformat(draft.scheduled_at)
+                    default_date = parsed_dt.date()
+                    default_time = parsed_dt.time()
+                except Exception:
+                    pass
+
+            if not default_date:
+                now_dt = datetime.now()
+                default_date = now_dt.date() + timedelta(days=1)
+                default_time = now_dt.time()
+
+            schedule_date = st.date_input("Scheduled Date", value=default_date, key=f"sch_date_{draft.id}")
+            schedule_time = st.time_input("Scheduled Time", value=default_time, key=f"sch_time_{draft.id}")
             scheduled_iso = f"{schedule_date.isoformat()}T{schedule_time.strftime('%H:%M:%S')}"
             draft.scheduled_at = scheduled_iso
+
+    with st.expander("🎨 Featured Hero Graphic & Media Asset", expanded=bool(draft.featured_image)):
+        col_hero_prev, col_hero_edit = st.columns([1, 2], vertical_alignment="center")
+        with col_hero_prev:
+            if draft.featured_image:
+                render_safe_image(draft.featured_image, caption="Featured Hero Asset", use_container_width=True)
+            else:
+                st.info("ℹ️ No featured hero graphic generated or attached yet.")
+        with col_hero_edit:
+            new_hero_url = st.text_input(
+                "Featured Image URL / File Path",
+                value=draft.featured_image or "",
+                placeholder="https://... or generated image path",
+                help="Featured image used as WordPress post thumbnail, OpenGraph social banner, and article header.",
+                key=f"hero_img_input_{draft.id}"
+            )
+            clean_hero = new_hero_url.strip()
+            if clean_hero.startswith("//"):
+                clean_hero = f"https:{clean_hero}"
+            if clean_hero != (draft.featured_image or ""):
+                draft.featured_image = clean_hero
+                save_draft(draft)
+                st.toast("Updated featured hero image!", icon="🎨")
+                st.rerun()
 
     st.markdown("---")
 
@@ -242,17 +330,24 @@ def render_review_tab():
 
         edit_meta_desc = st.text_area("Meta Description (150-160 chars)", value=draft.meta_description, height=70)
 
+        edit_markdown = st.session_state.get(f"editor_md_input_{draft.id}", draft.content_markdown)
+        w_count = len(edit_markdown.split())
+        read_time = max(1, round(w_count / 220))
+        st.caption(f"📊 **Live Word Count:** `{w_count:,}` words &nbsp;•&nbsp; ⏱️ **Estimated Reading Time:** `~{read_time} min read`")
+
         tab_preview, tab_raw_md, tab_html = st.tabs(["👁️ Live Preview", "📝 Markdown Editor", "🏷️ HTML & Schema"])
 
         with tab_preview:
-            html_preview = markdown.markdown(draft.content_markdown, extensions=["tables", "fenced_code", "nl2br"])
+            preview_source = st.session_state.get(f"editor_md_input_{draft.id}", draft.content_markdown)
+            html_preview = markdown.markdown(preview_source, extensions=["tables", "fenced_code", "nl2br"])
             st.markdown(f'<div class="apple-prose-container">{html_preview}</div>', unsafe_allow_html=True)
 
         with tab_raw_md:
             edit_markdown = st.text_area(
                 "Article Markdown",
                 value=draft.content_markdown,
-                height=520
+                height=520,
+                key=f"editor_md_input_{draft.id}"
             )
 
         with tab_html:
@@ -270,7 +365,7 @@ def render_review_tab():
             st.caption(f"Select a quick preset or type custom instructions to rewrite any section using **{active_model_name}**.")
             
             # Quick preset buttons for instant UX
-            p_col1, p_col2, p_col3, p_col4 = st.columns(4)
+            p_col1, p_col2, p_col3, p_col4 = st.columns(4, vertical_alignment="center")
             with p_col1:
                 if st.button("✨ Polish Tone", key="p_btn_tone", use_container_width=True):
                     st.session_state["regen_preset_val"] = "Make the tone authoritative, engaging, and flow naturally with seamless transitions."
@@ -311,7 +406,7 @@ def render_review_tab():
                 st.markdown("##### 📝 Revised Markdown Preview:")
                 st.text_area("Revised Markdown", value=revised_text, height=140, key="revised_md_preview_box")
                 
-                col_rev_act1, col_rev_act2 = st.columns([1.5, 1])
+                col_rev_act1, col_rev_act2 = st.columns([1.5, 1], vertical_alignment="center")
                 with col_rev_act1:
                     if st.button("📥 Apply Revision to Article Draft", type="primary", use_container_width=True, key="btn_apply_rev_direct"):
                         # Save undo snapshot
@@ -356,7 +451,7 @@ def render_review_tab():
         </div>
         """, unsafe_allow_html=True)
 
-        act_col1, act_col2, act_col3, act_col4 = st.columns(4)
+        act_col1, act_col2, act_col3, act_col4, act_col5 = st.columns(5, vertical_alignment="center")
 
         with act_col1:
             if st.button("💾 Save Changes", type="primary", use_container_width=True):
@@ -440,3 +535,14 @@ def render_review_tab():
                         else:
                             st.error(f"Publish failed: {res['message']}")
             st.caption("🚀 Immediate live WordPress push")
+
+        with act_col5:
+            with st.popover("🗑️ Delete", use_container_width=True):
+                st.markdown(f"Delete **'{draft.title[:35]}...'**?")
+                st.caption("This action permanently removes this draft from the SQLite database.")
+                if st.button("🔥 Confirm Delete", type="primary", use_container_width=True, key=f"del_draft_btn_{draft.id}"):
+                    delete_draft(draft.id)
+                    st.toast(f"🗑️ Draft '{draft.id}' deleted.", icon="🗑️")
+                    st.session_state.pop("review_selected_draft_id", None)
+                    st.rerun()
+            st.caption("🗑️ Discard unwanted draft")

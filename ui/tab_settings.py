@@ -109,7 +109,7 @@ def render_settings_tab():
             key="settings_openai_timeout_slider"
         )
 
-        col_save_openai, col_test_openai, col_test_img = st.columns([1, 1, 1])
+        col_save_openai, col_test_openai, col_test_img = st.columns([1, 1, 1], vertical_alignment="bottom")
         with col_save_openai:
             if st.button("💾 Save OpenAI & Image Settings", use_container_width=True, type="primary", key="btn_save_openai"):
                 if openai_key.strip():
@@ -198,7 +198,7 @@ def render_settings_tab():
             key="settings_gemini_timeout_slider"
         )
 
-        col_save_gemini, col_test_gemini = st.columns([1, 1])
+        col_save_gemini, col_test_gemini = st.columns([1, 1], vertical_alignment="bottom")
         with col_save_gemini:
             if st.button("💾 Save Gemini Key & Model", use_container_width=True, type="primary", key="btn_save_gemini"):
                 if gemini_key.strip():
@@ -267,7 +267,7 @@ def render_settings_tab():
             key="settings_scraper_proxy_input",
             height=90
         )
-        col_prx_test, col_prx_info = st.columns([1, 2])
+        col_prx_test, col_prx_info = st.columns([1, 2], vertical_alignment="center")
         with col_prx_test:
             if st.button("🔌 Test Proxy Connection", use_container_width=True, key="btn_test_proxy"):
                 st.toast("Testing proxy connection...", icon="🔌")
@@ -325,15 +325,17 @@ def render_settings_tab():
     if existing_presets:
         st.markdown("#### Existing Presets:")
         for ep in existing_presets:
-            col_p1, col_p2 = st.columns([4, 1])
+            col_p1, col_p2 = st.columns([4, 1], vertical_alignment="center")
             with col_p1:
                 st.markdown(f"**{ep['name']}** (Keyword: `{ep.get('keyword', 'N/A')}`) - {len(ep['asins'].splitlines())} items")
             with col_p2:
-                if st.button("🗑️ Delete", key=f"del_preset_{ep['id']}"):
-                    delete_asin_preset(ep["id"])
-                    st.toast("🗑️ Preset deleted.", icon="ℹ️")
-                    st.success("Preset deleted.")
-                    st.rerun()
+                with st.popover("🗑️ Delete", use_container_width=True):
+                    st.markdown(f"Delete preset **{ep['name']}**?")
+                    st.caption("This will permanently remove this saved ASIN preset.")
+                    if st.button("🔥 Confirm Delete", type="primary", use_container_width=True, key=f"confirm_del_preset_{ep['id']}"):
+                        delete_asin_preset(ep["id"])
+                        st.toast(f"🗑️ Preset '{ep['name']}' deleted.", icon="🗑️")
+                        st.rerun()
 
     st.markdown("---")
 
@@ -349,7 +351,7 @@ def render_settings_tab():
     t_c3.metric("Tokens Saved", f"~{tok_stats['estimated_tokens_saved']:,}")
     t_c4.metric("Est. Savings", f"${tok_stats['estimated_cost_saved_usd']}")
 
-    col_cache_tog, col_cache_btn = st.columns([2, 1])
+    col_cache_tog, col_cache_btn = st.columns([2, 1], vertical_alignment="center")
     with col_cache_tog:
         curr_cache_enabled = getattr(settings, "ENABLE_LLM_CACHE", True)
         enable_cache = st.checkbox(
@@ -365,12 +367,14 @@ def render_settings_tab():
             st.rerun()
 
     with col_cache_btn:
-        st.write("")
-        if st.button("🗑️ Clear LLM Cache", use_container_width=True, key="btn_clear_llm_cache"):
-            cleared = clear_llm_cache()
-            st.toast(f"🗑️ Cleared {cleared} cached entries!", icon="⚡")
-            st.success(f"Cleared {cleared} cached LLM response entries!")
-            st.rerun()
+        with st.popover("🗑️ Clear LLM Cache", use_container_width=True):
+            st.markdown("⚠️ **Clear Cached LLM Responses?**")
+            st.caption("This purges all deterministic cache entries from SQLite. Future identical prompts will call the LLM API.")
+            if st.button("🔥 Yes, Clear Cache", type="primary", use_container_width=True, key="btn_confirm_clear_llm_cache"):
+                cleared = clear_llm_cache()
+                st.toast(f"🗑️ Cleared {cleared} cached entries!", icon="⚡")
+                st.success(f"Cleared {cleared} cached LLM response entries!")
+                st.rerun()
 
     st.markdown("---")
 
@@ -385,7 +389,7 @@ def render_settings_tab():
     db_c2.metric("Saved Drafts", drafts_count)
     db_c3.metric("Saved ASIN Presets", presets_count)
 
-    col_purge1, col_purge2 = st.columns(2)
+    col_purge1, col_purge2 = st.columns(2, vertical_alignment="center")
     with col_purge1:
         if st.button("🧹 Purge Mock/Test Drafts", use_container_width=True, key="btn_purge_mock_drafts"):
             purged = purge_mock_test_drafts()
@@ -393,11 +397,13 @@ def render_settings_tab():
             st.success(f"Purged {purged} mock/test drafts!")
             st.rerun()
     with col_purge2:
-        if st.button("🗑️ Reset All Drafts to Zero", use_container_width=True, key="btn_purge_all_drafts"):
-            purged = purge_all_drafts()
-            st.toast(f"🗑️ Reset: {purged} drafts deleted.", icon="🗑️")
-            st.success(f"Reset complete: Deleted {purged} drafts.")
-            st.rerun()
+        with st.popover("🗑️ Reset All Drafts to Zero", use_container_width=True):
+            st.markdown("⚠️ **Danger Zone:** This will permanently delete all article drafts in your local database. This cannot be undone.")
+            if st.button("🔥 Yes, Permanently Delete All Drafts", type="primary", use_container_width=True, key="btn_confirm_purge_all"):
+                purged = purge_all_drafts()
+                st.toast(f"🗑️ Reset: {purged} drafts deleted.", icon="🗑️")
+                st.success(f"Reset complete: Deleted {purged} drafts.")
+                st.rerun()
 
     st.caption("All application data is securely hosted locally in SQLite.")
 
@@ -405,7 +411,7 @@ def render_settings_tab():
     st.markdown("### 📦 Project Data Backup & Sourcing Templates (Section 13 & 19)")
     st.caption("Export full SQLite database snapshots for offline safety, and download standardized CSV templates for manual product data & bulk queues.")
 
-    b_col1, b_col2, b_col3 = st.columns(3)
+    b_col1, b_col2, b_col3 = st.columns(3, vertical_alignment="center")
     with b_col1:
         db_bytes = b""
         if os.path.exists(DB_PATH):

@@ -7,23 +7,22 @@ def render_keyword_research_tab():
     active_provider = getattr(settings, "get_active_provider", lambda: getattr(settings, "AI_PROVIDER", "openai"))()
     active_model_name = "GPT-6 Luna" if active_provider == "openai" else "Gemini"
 
-    st.markdown("### 🔍 Keyword Intent & Editorial Strategy Explorer")
+    st.subheader("🔍 Keyword Intent & Editorial Strategy Explorer")
     st.caption(f"Expand seed keywords into search intent, People Also Ask (PAA) queries, and 3 distinct editorial angles powered by **{active_model_name}**. Grounded in truthful search dynamics—no fabricated volume numbers.")
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        keyword_input = st.text_input(
-            "Target Seed Keyword",
-            value=st.session_state.get("last_researched_kw", ""),
-            placeholder="e.g. best ergonomic office chair under 300, quiet air purifier for bedroom",
-            help="Enter a product niche or search query to analyze consumer intent and editorial hooks."
-        )
-    with col2:
-        st.write("")
-        st.write("")
-        analyze_btn = st.button("🚀 Analyze Keyword", type="primary", use_container_width=True)
+    with st.form("kw_search_form", border=False):
+        col1, col2 = st.columns([3, 1], vertical_alignment="bottom")
+        with col1:
+            keyword_input = st.text_input(
+                "Target Seed Keyword",
+                value=st.session_state.get("last_researched_kw", ""),
+                placeholder="e.g. best ergonomic office chair under 300, quiet air purifier for bedroom",
+                help="Enter a product niche or search query to analyze consumer intent and editorial hooks."
+            )
+        with col2:
+            analyze_btn = st.form_submit_button("🚀 Analyze Keyword", type="primary", use_container_width=True)
 
-    if analyze_btn and keyword_input.strip():
+    if (analyze_btn or st.session_state.pop("trigger_kw_analysis", False)) and keyword_input.strip():
         st.session_state["last_researched_kw"] = keyword_input.strip()
         with st.spinner(f"Analyzing search intent, queries, and editorial angles with {active_model_name}..."):
             client = get_llm_client()
@@ -33,7 +32,15 @@ def render_keyword_research_tab():
     result: KeywordAnalysisResult = st.session_state.get("kw_analysis_result")
     if result and result.keyword:
         st.divider()
-        st.markdown(f"#### 🔍 Editorial Intent Blueprint: **{result.keyword}**")
+        col_res_h1, col_res_h2 = st.columns([4, 1], vertical_alignment="center")
+        with col_res_h1:
+            st.markdown(f"#### 🔍 Editorial Intent Blueprint: **{result.keyword}**")
+        with col_res_h2:
+            if st.button("✕ Clear", use_container_width=True, help="Clear current keyword analysis"):
+                st.session_state.pop("kw_analysis_result", None)
+                st.session_state.pop("last_researched_kw", None)
+                st.toast("Keyword analysis cleared.", icon="✕")
+                st.rerun()
 
         # Top Intent & Format Summary (Apple Capsule Pills)
         intent_bg, intent_fg, intent_border = {
@@ -56,13 +63,13 @@ def render_keyword_research_tab():
 
         # PAA & Related Queries in 2 columns
         st.markdown("---")
-        q_col, r_col = st.columns(2)
+        q_col, r_col = st.columns(2, vertical_alignment="top")
 
         with q_col:
             st.markdown("##### ❓ High-Intent Questions (People Also Ask)")
             if result.user_questions:
                 for idx, q in enumerate(result.user_questions, 1):
-                    with st.expander(f"Q{idx}: {q.question}", expanded=True):
+                    with st.expander(f"Q{idx}: {q.question}", expanded=(idx == 1)):
                         st.markdown(f"**Key Editorial Focus:** {q.focal_answer_point}")
             else:
                 st.info("No specific user questions generated.")
@@ -73,12 +80,14 @@ def render_keyword_research_tab():
                 for qry in result.related_queries:
                     st.markdown(f"- `{qry}`")
                 
-                # Bulk queue quick-export helper
-                if st.button("➕ Push Related Queries to Bulk Queue Input", use_container_width=True):
+                # Bulk queue quick-export helper with direct 1-click handoff
+                if st.button("➕ Push to Bulk Queue & Open Tab ➔", use_container_width=True, type="secondary"):
                     existing_bulk = st.session_state.get("bulk_keywords_input", "")
                     combined = (existing_bulk.strip() + "\n" + "\n".join(result.related_queries)).strip()
                     st.session_state["bulk_keywords_input"] = combined
-                    st.toast(f"Added {len(result.related_queries)} queries to Bulk Queue buffer!", icon="📋")
+                    st.toast(f"Added {len(result.related_queries)} queries! Opening Bulk Queue...", icon="📋")
+                    st.session_state["target_nav_tab"] = "Bulk Queue"
+                    st.rerun()
             else:
                 st.info("No related queries available.")
 
@@ -87,7 +96,7 @@ def render_keyword_research_tab():
         st.markdown("##### 🎯 3 Differentiated Editorial Angles")
         st.caption("Choose an editorial perspective tailored to your audience to avoid generic affiliate copy.")
 
-        cols = st.columns(3)
+        cols = st.columns(3, vertical_alignment="top")
         angle_themes = [
             ("💎", "var(--apple-blue)", "rgba(0, 113, 227, 0.08)", "rgba(0, 113, 227, 0.25)"),
             ("⚖️", "var(--apple-purple)", "rgba(175, 82, 222, 0.08)", "rgba(175, 82, 222, 0.25)"),
@@ -109,12 +118,12 @@ def render_keyword_research_tab():
                     )
                     st.markdown(card_html, unsafe_allow_html=True)
                     st.markdown(f"**Core Editorial Focus:**\n*{angle.editorial_focus}*")
-                    st.write("")
                     if st.button(f"🚀 Dispatch to Single Workflow", key=f"btn_angle_{idx}", use_container_width=True, type="secondary"):
                         st.session_state["workflow_seed_keyword"] = result.keyword
                         st.session_state["workflow_editorial_angle"] = angle.name
                         st.session_state["workflow_editorial_focus"] = angle.editorial_focus
                         st.session_state["workflow_article_type"] = result.recommended_article_type
+                        st.session_state["sw_stage"] = 1
                         st.session_state["target_nav_tab"] = "Single Workflow"
                         st.toast(f"Angle '{angle.name}' applied! Switched to Single Workflow.", icon="🚀")
                         st.rerun()
@@ -122,3 +131,32 @@ def render_keyword_research_tab():
         # Truthfulness / Policy Footnote
         st.markdown("---")
         st.info(f"💡 **Policy & Data Integrity Note:** {result.metrics_note}")
+    else:
+        st.markdown("""
+        <div class="apple-card-elevated" style="padding: 22px 26px; margin-top: 18px; border-radius: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="font-size: 1.3rem;">💡</span>
+                <span style="font-weight: 700; font-size: 1.02rem; color: var(--apple-ink-primary); letter-spacing: -0.01em;">Quick Editorial Blueprint Starters</span>
+            </div>
+            <div style="font-size: 0.86rem; color: var(--apple-ink-secondary); line-height: 1.5; margin-bottom: 14px;">
+                Select a high-intent Amazon affiliate seed query below to immediately analyze search intent, People Also Ask queries, and 3 differentiated editorial angles:
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        q_s1, q_s2, q_s3 = st.columns(3, vertical_alignment="center")
+        with q_s1:
+            if st.button("🎧 noise cancelling headphones for flights", use_container_width=True, key="seed_kw_1"):
+                st.session_state["last_researched_kw"] = "best noise cancelling headphones for flights"
+                st.session_state["trigger_kw_analysis"] = True
+                st.rerun()
+        with q_s2:
+            if st.button("💺 ergonomic office chair under 300", use_container_width=True, key="seed_kw_2"):
+                st.session_state["last_researched_kw"] = "best ergonomic office chair under 300"
+                st.session_state["trigger_kw_analysis"] = True
+                st.rerun()
+        with q_s3:
+            if st.button("🌿 quiet air purifier for bedroom", use_container_width=True, key="seed_kw_3"):
+                st.session_state["last_researched_kw"] = "quiet air purifier for bedroom"
+                st.session_state["trigger_kw_analysis"] = True
+                st.rerun()

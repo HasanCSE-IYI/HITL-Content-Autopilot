@@ -52,12 +52,12 @@ def set_database_path(new_path: str):
 def get_connection():
     global DB_PATH
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30.0)
         conn.row_factory = sqlite3.Row
         return conn
     except Exception:
         DB_PATH = str(Path(tempfile.gettempdir()) / "hitl_autopilot.db")
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30.0)
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -79,6 +79,11 @@ def _ensure_column(conn, table_name: str, column_def: str):
 def init_db():
     conn = get_connection()
     with conn:
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+        except Exception:
+            pass
         # 1. Drafts table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS drafts (

@@ -241,36 +241,91 @@ st.markdown("""
         letter-spacing: -0.03em !important;
     }
 
-    /* Apple Segmented Tabs */
+    /* =============================================================
+       🍏 Apple Cupertino Glassmorphic Segmented Navigation Bar
+       ============================================================= */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px !important;
-        margin-bottom: 24px !important;
+        display: inline-flex !important;
+        align-items: center !important;
         background: var(--apple-surface-secondary) !important;
-        padding: 6px !important;
-        border-radius: 14px !important;
+        backdrop-filter: blur(28px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+        padding: 5px !important;
+        border-radius: 9999px !important;
         border: 1px solid var(--apple-border) !important;
+        box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+        gap: 4px !important;
+        margin-bottom: 24px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        white-space: nowrap !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    /* Suppress BaseWeb Default Red/Pink Highlight & Bottom Border */
+    .stTabs [data-baseweb="tab-highlight"],
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+    }
+
+    /* Base Tab Pill */
     .stTabs [data-baseweb="tab"] {
-        height: 44px !important;
-        white-space: pre-wrap !important;
-        font-weight: 600 !important;
-        font-size: 0.92rem !important;
-        border-radius: 10px !important;
+        height: 42px !important;
+        border-radius: 9999px !important;
         padding: 0 18px !important;
-        border: none !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
         color: var(--apple-ink-secondary) !important;
         background: transparent !important;
-        transition: all 0.18s var(--apple-ease) !important;
+        border: none !important;
+        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        letter-spacing: -0.01em !important;
     }
     .stTabs [data-baseweb="tab"]:hover {
         color: var(--apple-ink-primary) !important;
-        background: rgba(125, 125, 125, 0.12) !important;
+        background: rgba(125, 125, 125, 0.1) !important;
+        transform: translateY(-1px) !important;
     }
+    .stTabs [data-baseweb="tab"]:focus-visible {
+        outline: none !important;
+        box-shadow: 0 0 0 3px var(--apple-border-focus) !important;
+    }
+
+    /* Active Selected Tab Pill */
     .stTabs [aria-selected="true"] {
         background: var(--apple-surface-card) !important;
         color: var(--apple-blue) !important;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
         font-weight: 700 !important;
+        box-shadow: 0 3px 12px rgba(0, 113, 227, 0.15), 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+        border: 1px solid rgba(0, 113, 227, 0.22) !important;
+        transform: none !important;
+    }
+
+    /* Nested In-Page Sub-Tabs (Visual Hierarchy Distinction) */
+    .stTabs .stTabs [data-baseweb="tab-list"] {
+        border-radius: 12px !important;
+        padding: 3px !important;
+        background: rgba(125, 125, 125, 0.08) !important;
+        margin-bottom: 16px !important;
+        box-shadow: none !important;
+    }
+    .stTabs .stTabs [data-baseweb="tab"] {
+        height: 34px !important;
+        border-radius: 9px !important;
+        padding: 0 14px !important;
+        font-size: 0.82rem !important;
+    }
+    .stTabs .stTabs [aria-selected="true"] {
+        border-radius: 9px !important;
     }
 
     /* Tactile Button System */
@@ -280,6 +335,10 @@ st.markdown("""
         letter-spacing: -0.01em !important;
         transition: all 0.2s var(--apple-ease) !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    }
+    button:focus-visible, a:focus-visible {
+        outline: 2px solid var(--apple-blue) !important;
+        outline-offset: 2px !important;
     }
     button:active {
         transform: scale(0.975) !important;
@@ -333,6 +392,105 @@ st.markdown("""
     [data-testid="stExpander"]:hover {
         border-color: rgba(0, 113, 227, 0.25) !important;
         box-shadow: var(--apple-shadow-md) !important;
+    }
+
+    /* Streamlit Container Cards & Forms */
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        background: var(--apple-surface-card) !important;
+        border: 1px solid var(--apple-border) !important;
+        border-radius: 16px !important;
+        padding: 18px 22px !important;
+        box-shadow: var(--apple-shadow-sm) !important;
+        transition: transform 0.2s var(--apple-ease), box-shadow 0.2s var(--apple-ease), border-color 0.2s var(--apple-ease) !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] > div:hover {
+        border-color: rgba(0, 113, 227, 0.25) !important;
+        box-shadow: var(--apple-shadow-hover) !important;
+    }
+    div[data-testid="stForm"] {
+        background: var(--apple-surface-card) !important;
+        border: 1px solid var(--apple-border) !important;
+        border-radius: 16px !important;
+        padding: 20px 24px !important;
+        box-shadow: var(--apple-shadow-sm) !important;
+    }
+
+    /* Translucent Frosted Glass Alert Callouts */
+    div[data-testid="stAlert"] {
+        border-radius: 14px !important;
+        border: 1px solid var(--apple-border) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        padding: 14px 18px !important;
+        font-size: 0.92rem !important;
+        box-shadow: var(--apple-shadow-sm) !important;
+    }
+    div[data-testid="stAlert"]:has([data-testid="stAlertContentError"]) {
+        background: rgba(239, 68, 68, 0.08) !important;
+        border-color: rgba(239, 68, 68, 0.25) !important;
+    }
+    div[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {
+        background: rgba(255, 149, 0, 0.08) !important;
+        border-color: rgba(255, 149, 0, 0.25) !important;
+    }
+    div[data-testid="stAlert"]:has([data-testid="stAlertContentSuccess"]) {
+        background: rgba(52, 199, 89, 0.08) !important;
+        border-color: rgba(52, 199, 89, 0.25) !important;
+    }
+    div[data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) {
+        background: rgba(0, 113, 227, 0.06) !important;
+        border-color: rgba(0, 113, 227, 0.2) !important;
+    }
+
+    /* Apple Dividers */
+    hr, [data-testid="stDivider"] {
+        border: none !important;
+        height: 1px !important;
+        background: var(--apple-border) !important;
+        margin: 24px 0 !important;
+    }
+
+    /* Multiselect Tag Badges */
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] {
+        background: rgba(0, 113, 227, 0.1) !important;
+        color: var(--apple-blue) !important;
+        border-radius: 9999px !important;
+        border: 1px solid rgba(0, 113, 227, 0.25) !important;
+        font-weight: 600 !important;
+        font-size: 0.82rem !important;
+        padding: 2px 10px !important;
+    }
+
+    /* Date & Time Input Popovers */
+    div[data-testid="stDateInput"] input,
+    div[data-testid="stTimeInput"] input {
+        border-radius: 10px !important;
+        border: 1px solid var(--apple-border) !important;
+        background: var(--apple-input-bg) !important;
+    }
+
+    /* File Uploader Dropzone */
+    div[data-testid="stFileUploader"] section {
+        background: var(--apple-surface-secondary) !important;
+        border: 1.5px dashed var(--apple-border-strong) !important;
+        border-radius: 14px !important;
+        padding: 20px 24px !important;
+        transition: all 0.2s var(--apple-ease) !important;
+    }
+    div[data-testid="stFileUploader"] section:hover {
+        border-color: var(--apple-blue) !important;
+        background: rgba(0, 113, 227, 0.04) !important;
+    }
+
+    /* macOS Floating Toast Notifications */
+    div[data-testid="stToast"] {
+        background: var(--apple-surface-card) !important;
+        border: 1px solid var(--apple-border) !important;
+        border-radius: 14px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        color: var(--apple-ink-primary) !important;
     }
 
     /* macOS Floating Telemetry Dock */
@@ -602,6 +760,155 @@ st.markdown("""
         .bento-value, .status-card-title, .main-header {
             color: var(--apple-ink-primary) !important;
         }
+        .stTabs [aria-selected="true"] {
+            background: #2c2c2e !important;
+            color: #2997ff !important;
+            border-color: rgba(41, 151, 255, 0.3) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+        }
+    }
+
+    /* =============================================================
+       📱 Apple HIG Fully Responsive Layout & Breakpoint System
+       ============================================================= */
+
+    /* Fluid Typography & Brand Layout */
+    .brand-container {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    .main-header {
+        font-size: clamp(1.35rem, 3.2vw, 2.05rem) !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.03em !important;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .sub-header {
+        font-size: clamp(0.82rem, 1.8vw, 0.95rem) !important;
+        line-height: 1.55 !important;
+        margin-bottom: 20px !important;
+    }
+
+    /* Apple Stepper Responsiveness & Alignment */
+    .apple-stepper-container {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        padding: 12px 20px !important;
+        border-radius: 14px !important;
+        margin-bottom: 22px !important;
+        background: var(--apple-surface-secondary) !important;
+        border: 1px solid var(--apple-border) !important;
+    }
+    .apple-stepper-container::-webkit-scrollbar {
+        display: none !important;
+    }
+    .apple-stepper-chip {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Equal Height Bento & Status Cards */
+    .apple-bento-card {
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        min-height: 110px !important;
+    }
+    .apple-status-card {
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        min-height: 90px !important;
+    }
+
+
+    /* Large Tablets & Small Laptops (max-width: 1024px) */
+    @media (max-width: 1024px) {
+        .block-container {
+            padding-top: 1.5rem !important;
+            padding-bottom: 2.5rem !important;
+            max-width: 98% !important;
+        }
+        .apple-bento-card {
+            padding: 14px 16px !important;
+        }
+        .apple-status-card {
+            padding: 12px 14px !important;
+        }
+    }
+
+    /* Tablets (max-width: 860px) */
+    @media (max-width: 860px) {
+        div[data-testid="stHorizontalBlock"]:has(.apple-bento-card),
+        div[data-testid="stHorizontalBlock"]:has(.apple-status-card),
+        div[data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.apple-bento-card) > div[data-testid="column"] {
+            min-width: calc(33.333% - 10px) !important;
+            flex: 1 1 calc(33.333% - 10px) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.apple-status-card) > div[data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > div[data-testid="column"] {
+            min-width: calc(50% - 10px) !important;
+            flex: 1 1 calc(50% - 10px) !important;
+        }
+        .apple-action-dock {
+            padding: 14px 18px !important;
+        }
+        .apple-prose-container {
+            padding: 18px 20px !important;
+        }
+    }
+
+    /* Mobile Devices (max-width: 640px) */
+    @media (max-width: 640px) {
+        .block-container {
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+            padding-top: 1rem !important;
+            max-width: 100% !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.apple-bento-card) > div[data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has(.apple-status-card) > div[data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > div[data-testid="column"] {
+            min-width: calc(50% - 8px) !important;
+            flex: 1 1 calc(50% - 8px) !important;
+        }
+        .brand-logo-badge {
+            width: 40px !important;
+            height: 40px !important;
+            font-size: 1.4rem !important;
+        }
+        .apple-action-dock {
+            border-radius: 14px !important;
+            padding: 12px 14px !important;
+        }
+        .apple-prose-container {
+            border-radius: 12px !important;
+            padding: 14px 16px !important;
+        }
+        .apple-prose-container table {
+            display: block !important;
+            overflow-x: auto !important;
+            white-space: nowrap !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -640,7 +947,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Top Metrics Ribbon (Apple Bento Cards)
-m1, m2, m3, m4, m5 = st.columns(5)
+m1, m2, m3, m4, m5 = st.columns(5, vertical_alignment="top")
 with m1:
     st.markdown(f"""
     <div class="apple-bento-card">
@@ -652,23 +959,31 @@ with m1:
         <div class="bento-subtitle">All drafts in database</div>
     </div>
     """, unsafe_allow_html=True)
+    if total_count > 0:
+        if st.button("📋 View Queue ➔", key="bento_goto_queue_btn", use_container_width=True):
+            st.session_state["target_nav_tab"] = "HITL Review"
+            st.rerun()
 with m2:
     st.markdown(f"""
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Needs Review</span>
-            <span class="bento-icon-badge" style="background: rgba(255, 149, 0, 0.1); color: var(--apple-amber);">🟡</span>
+            <span class="bento-icon-badge" style="background: rgba(255, 149, 0, 0.1); color: var(--apple-amber);">⏳</span>
         </div>
         <div class="bento-value" style="color: var(--apple-amber-dark);">{needs_review}</div>
         <div class="bento-subtitle">Awaiting HITL audit</div>
     </div>
     """, unsafe_allow_html=True)
+    if needs_review > 0:
+        if st.button(f"👉 Review ({needs_review}) ➔", key="bento_goto_rev_btn", use_container_width=True):
+            st.session_state["target_nav_tab"] = "HITL Review"
+            st.rerun()
 with m3:
     st.markdown(f"""
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Approved</span>
-            <span class="bento-icon-badge" style="background: rgba(52, 199, 89, 0.1); color: var(--apple-green);">🟢</span>
+            <span class="bento-icon-badge" style="background: rgba(52, 199, 89, 0.1); color: var(--apple-green);">✅</span>
         </div>
         <div class="bento-value" style="color: var(--apple-green-dark);">{approved}</div>
         <div class="bento-subtitle">Ready for publishing</div>
@@ -679,7 +994,7 @@ with m4:
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Scheduled</span>
-            <span class="bento-icon-badge" style="background: rgba(88, 86, 214, 0.1); color: var(--apple-indigo);">📅</span>
+            <span class="bento-icon-badge" style="background: rgba(88, 86, 214, 0.1); color: var(--apple-indigo);">🗓️</span>
         </div>
         <div class="bento-value" style="color: var(--apple-indigo-dark);">{scheduled}</div>
         <div class="bento-subtitle">Auto-publish queue</div>
@@ -690,7 +1005,7 @@ with m5:
     <div class="apple-bento-card">
         <div class="bento-header">
             <span class="bento-title">Published</span>
-            <span class="bento-icon-badge" style="background: rgba(175, 82, 222, 0.1); color: var(--apple-purple);">🟣</span>
+            <span class="bento-icon-badge" style="background: rgba(175, 82, 222, 0.1); color: var(--apple-purple);">🚀</span>
         </div>
         <div class="bento-value" style="color: var(--apple-purple-dark);">{published}</div>
         <div class="bento-subtitle">Live on WordPress</div>
@@ -699,21 +1014,23 @@ with m5:
 
 st.markdown("---")
 
-# Navigation Tabs (7 Structured Tabs)
+# Navigation Tabs (7 Structured Tabs - Optimized for zero-truncation fit)
+rev_badge = f"🔥 {needs_review}" if needs_review > 0 else "0"
 TAB_OPTIONS = [
-    "🔍 1. Keyword Intent Explorer",
+    "🔍 1. Keyword Explorer",
     "🚀 2. Single Workflow",
-    "⚡ 3. Bulk Queue (20–50 KWs)",
-    f"📝 4. HITL Review Studio ({needs_review})",
-    f"🌐 5. Multi-Site WordPress ({len(sites)})",
-    "📈 6. Monitor & Freshness Alerts",
-    "⚙️ 7. Settings, Proxies & Credentials"
+    "⚡ 3. Bulk Queue",
+    f"📝 4. HITL Review ({rev_badge})",
+    f"🌐 5. Multi-Site WP ({len(sites)})",
+    "📈 6. Monitor & Alerts",
+    "⚙️ 7. Settings & Proxies"
 ]
 
-# Programmatic Tab Navigation Controller
+# Programmatic Tab Navigation Controller with resilient fuzzy match
 target_nav = st.session_state.pop("target_nav_tab", None)
 if target_nav:
-    matched = next((t for t in TAB_OPTIONS if target_nav.lower() in t.lower()), None)
+    target_lower = target_nav.lower()
+    matched = next((t for t in TAB_OPTIONS if target_lower in t.lower() or any(w in t.lower() for w in target_lower.split() if len(w) > 3)), None)
     if matched:
         st.session_state["main_navigation_tabs"] = matched
 
@@ -759,17 +1076,35 @@ with tab_set:
 # ⚙️ macOS Floating Telemetry Dock
 # =========================================================================
 st.markdown("---")
-st.markdown("""
-<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+col_dock_h1, col_dock_h2 = st.columns([3.5, 1.5], vertical_alignment="center")
+with col_dock_h1:
+    st.markdown("""
     <div style="display: flex; align-items: center; gap: 8px;">
         <span class="apple-beacon-dot" style="background: var(--apple-green);"></span>
-        <span style="font-weight: 700; font-size: 0.95rem; color: var(--apple-ink-primary); letter-spacing: -0.01em;">macOS System Telemetry & Engine Dock</span>
+        <span style="font-weight: 700; font-size: 0.98rem; color: var(--apple-ink-primary); letter-spacing: -0.01em;">macOS System Telemetry & Engine Dock</span>
+        <span style="font-size: 0.78rem; color: var(--apple-ink-tertiary); margin-left: 6px;">• Live Local-First SQLite</span>
     </div>
-    <span style="font-size: 0.8rem; color: var(--apple-ink-tertiary); font-weight: 500;">Live Local-First SQLite</span>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+with col_dock_h2:
+    with st.popover("🔑 Manage AI Engine & Keys", use_container_width=True):
+        st.markdown("**Update Active AI Engine & Keys**")
+        gk = st.text_input("Gemini API Key", value=active_gemini_key, type="password", key="pop_gemini_key", placeholder="AIzaSy...")
+        ok = st.text_input("OpenAI API Key", value=active_openai_key, type="password", key="pop_openai_key", placeholder="sk-proj-...")
+        prov = st.selectbox("Default Provider", options=["gemini", "openai"], index=0 if active_provider == "gemini" else 1, key="pop_prov_select", format_func=lambda x: "✨ Google Gemini" if x == "gemini" else "🤖 OpenAI")
+        if st.button("Save AI Settings", use_container_width=True, type="primary", key="pop_save_btn"):
+            settings.save(
+                gemini_api_key=gk.strip() if gk.strip() else None,
+                openai_api_key=ok.strip() if ok.strip() else None,
+                ai_provider=prov
+            )
+            if gk.strip():
+                st.session_state["gemini_api_key"] = gk.strip()
+            if ok.strip():
+                st.session_state["openai_api_key"] = ok.strip()
+            st.success("AI Configuration updated!")
+            st.rerun()
 
-b1, b2, b3, b4, b5 = st.columns([1.3, 1.3, 1.1, 1.2, 1.1])
+b1, b2, b3, b4, b5 = st.columns([1.3, 1.3, 1.1, 1.2, 1.1], vertical_alignment="top")
 
 with b1:
     if active_provider == "openai":
@@ -798,24 +1133,6 @@ with b1:
             <div class="status-card-meta">{settings.GEMINI_MODEL} • Connected</div>
         </div>
         """, unsafe_allow_html=True)
-
-    with st.popover("🔑 Manage Provider & Keys", use_container_width=True):
-        st.markdown("**Update Provider Keys**")
-        gk = st.text_input("Gemini API Key", value=active_gemini_key, type="password", key="pop_gemini_key", placeholder="AIzaSy...")
-        ok = st.text_input("OpenAI API Key", value=active_openai_key, type="password", key="pop_openai_key", placeholder="sk-proj-...")
-        prov = st.selectbox("Default Provider", options=["gemini", "openai"], index=0 if active_provider == "gemini" else 1, key="pop_prov_select", format_func=lambda x: "✨ Google Gemini" if x == "gemini" else "🤖 OpenAI")
-        if st.button("Save AI Settings", use_container_width=True, type="primary", key="pop_save_btn"):
-            settings.save(
-                gemini_api_key=gk.strip() if gk.strip() else None,
-                openai_api_key=ok.strip() if ok.strip() else None,
-                ai_provider=prov
-            )
-            if gk.strip():
-                st.session_state["gemini_api_key"] = gk.strip()
-            if ok.strip():
-                st.session_state["openai_api_key"] = ok.strip()
-            st.success("AI Configuration updated!")
-            st.rerun()
 
 with b2:
     if sites:

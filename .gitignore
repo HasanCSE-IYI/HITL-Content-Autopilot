@@ -24,4 +24,5 @@ venv/
 ENV/
 
 # Streamlit config
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml

@@ -23,7 +23,10 @@ def render_bulk_queue_tab():
 
     sites = list_wordpress_sites()
 
-    col_pre1, col_pre2 = st.columns([3, 1.2])
+    col_pre1, col_pre2 = st.columns([3, 1.2], vertical_alignment="bottom")
+    with col_pre1:
+        if not sites:
+            st.info("💡 **WordPress Notice:** No sites connected. Connect in **Multi-Site WP** or save drafts locally.")
     with col_pre2:
         if st.button("📋 Load Sample 5-Keyword Batch", use_container_width=True, key="bulk_load_sample_btn"):
             st.session_state["bulk_keywords_input"] = SAMPLE_BULK_KEYWORDS
@@ -33,7 +36,7 @@ def render_bulk_queue_tab():
     # CSV Import Helper (Section 10 Compliance)
     with st.expander("📂 Import Keywords from CSV Spreadsheet", expanded=False):
         st.caption("Upload a CSV file containing keywords, optional ASINs, and article formats (roundup, single_review, comparison).")
-        csv_b1, csv_b2 = st.columns([1.5, 1])
+        csv_b1, csv_b2 = st.columns([1.5, 1], vertical_alignment="bottom")
         with csv_b2:
             st.download_button(
                 "📥 Download CSV Template",
@@ -62,7 +65,7 @@ def render_bulk_queue_tab():
 
     # 1. Bulk Batch Configuration Form
     with st.form("bulk_queue_form"):
-        col_b1, col_b2 = st.columns([2, 1])
+        col_b1, col_b2 = st.columns([2, 1], vertical_alignment="top")
 
         with col_b1:
             st.markdown("#### 1. Paste Keywords")
@@ -88,7 +91,7 @@ def render_bulk_queue_tab():
                     index=default_idx
                 )
             else:
-                st.warning("⚠️ No WordPress sites connected. You can still generate drafts and publish later.")
+                st.caption("ℹ️ No WordPress sites connected. Drafts will be saved locally to SQLite.")
 
             article_type = st.selectbox(
                 "Default Article Type",
@@ -171,7 +174,7 @@ def render_bulk_queue_tab():
         if t.batch_id not in unique_batches:
             unique_batches.append(t.batch_id)
 
-    col_m1, col_m2 = st.columns([3, 1])
+    col_m1, col_m2 = st.columns([3, 1], vertical_alignment="bottom")
     with col_m1:
         selected_batch = st.selectbox(
             "Select Batch to Monitor",
@@ -212,6 +215,12 @@ def render_bulk_queue_tab():
 
         if running_state:
             st.info("⚡ Background worker is actively generating drafts. This monitor updates every 3 seconds automatically without reloading the page.")
+        elif summary["percent_complete"] == 100 and summary["completed"] > 0:
+            col_b_done, _ = st.columns([1.8, 1], vertical_alignment="center")
+            with col_b_done:
+                if st.button("👉 Review Completed Batch in HITL Review ➔", type="primary", use_container_width=True, key=f"btn_review_batch_{batch_id}"):
+                    st.session_state["target_nav_tab"] = "HITL Review"
+                    st.rerun()
 
         # Metrics
         c1, c2, c3, c4, c5 = st.columns(5)
@@ -227,7 +236,7 @@ def render_bulk_queue_tab():
 
         for t in tasks_in_batch:
             with st.container(border=True):
-                col_t1, col_t2, col_t3, col_t4 = st.columns([3, 1, 1.2, 2])
+                col_t1, col_t2, col_t3, col_t4 = st.columns([3, 1, 1.2, 2], vertical_alignment="center")
                 with col_t1:
                     st.markdown(f"**{t.keyword}**")
                     if t.asins_or_facts:
@@ -245,7 +254,15 @@ def render_bulk_queue_tab():
                         st.markdown("""<span class="apple-pill-badge" style="background: var(--apple-surface-secondary); color: var(--apple-ink-secondary); border: 1px solid var(--apple-border);">⏳ Pending</span>""", unsafe_allow_html=True)
                 with col_t4:
                     if t.draft_id:
-                        st.caption(f"Draft ID: `{t.draft_id}`")
+                        col_dt1, col_dt2 = st.columns([1.2, 1], vertical_alignment="center")
+                        with col_dt1:
+                            st.caption(f"Draft: `...{t.draft_id[-8:]}`")
+                        with col_dt2:
+                            if st.button("📝 Review ➔", key=f"btn_inline_rev_{t.id}", use_container_width=True, type="secondary"):
+                                st.session_state["review_selected_draft_id"] = t.draft_id
+                                st.session_state["target_nav_tab"] = "HITL Review"
+                                st.toast(f"Opening draft '{t.draft_id}' in Review Studio...", icon="📝")
+                                st.rerun()
                     elif t.error_message:
                         st.caption(f"⚠️ {t.error_message[:45]}")
                         if st.button("🔁 Retry", key=f"inline_retry_{t.id}", use_container_width=True):
@@ -257,4 +274,4 @@ def render_bulk_queue_tab():
     render_live_batch_monitor(selected_batch)
 
     st.markdown("---")
-    st.info("💡 Once keywords are completed, they appear in the **'HITL Review Queue'** with full Quality Scorecards ready for your final approval!")
+    st.info("💡 Once keywords are completed, they appear in the **'📝 4. HITL Review'** tab with full Quality Scorecards ready for your final approval!")

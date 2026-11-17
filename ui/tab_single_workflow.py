@@ -63,18 +63,16 @@ def render_single_workflow_tab():
             text_color = "var(--apple-ink-secondary)"
 
         font_weight = "700" if active else ("600" if completed else "500")
-        return f'<div style="display: flex; align-items: center; gap: 8px;">{badge_html}<span style="font-weight: {font_weight}; font-size: 0.88rem; color: {text_color}; letter-spacing: -0.01em;">{label}</span></div>'
+        return f'<div class="apple-stepper-chip">{badge_html}<span style="font-weight: {font_weight}; font-size: 0.88rem; color: {text_color}; letter-spacing: -0.01em;">{label}</span></div>'
 
     s1_html = render_step_chip(1, "Topic & Format", active=current_stage == 1, completed=current_stage > 1)
     s2_html = render_step_chip(2, "Sourcing & 0–100 Audit", active=current_stage == 2, completed=current_stage > 2)
     s3_html = render_step_chip(3, "AI Drafting & Visuals", active=current_stage == 3, completed=current_stage > 3)
     s4_html = render_step_chip(4, "HITL Studio Approval", active=current_stage == 4, completed=False)
 
-    arrow_sep = '<span style="color: var(--apple-ink-tertiary); font-weight: bold; user-select: none;">➔</span>'
+    arrow_sep = '<span style="color: var(--apple-ink-tertiary); font-weight: bold; user-select: none; flex-shrink: 0;">➔</span>'
     stepper_html = (
-        '<div style="background: var(--apple-surface-secondary); border: 1px solid var(--apple-border); '
-        'border-radius: 14px; padding: 12px 20px; margin-bottom: 22px; display: flex; gap: 10px; '
-        f'align-items: center; justify-content: space-between; flex-wrap: wrap;">'
+        '<div class="apple-stepper-container">'
         f'{s1_html}{arrow_sep}{s2_html}{arrow_sep}{s3_html}{arrow_sep}{s4_html}'
         '</div>'
     )
@@ -104,7 +102,7 @@ def render_single_workflow_tab():
 
     if not current_key:
         st.warning(f"⚠️ **{chosen_provider.upper()} API Key Required**")
-        col_k1, col_k2 = st.columns([3, 1])
+        col_k1, col_k2 = st.columns([3, 1], vertical_alignment="center")
         with col_k1:
             quick_key = st.text_input(
                 f"Enter {key_label}",
@@ -150,7 +148,15 @@ def render_single_workflow_tab():
     saved_default_asins = sample_asins_requested or persisted_asins
 
     if pushed_angle:
-        st.info(f"🎯 **Applied Editorial Angle:** **{pushed_angle}** — Focus: *{pushed_focus}*")
+        col_ang1, col_ang2 = st.columns([4, 1], vertical_alignment="center")
+        with col_ang1:
+            st.info(f"🎯 **Applied Editorial Angle:** **{pushed_angle}** — Focus: *{pushed_focus}*")
+        with col_ang2:
+            if st.button("✕ Clear Angle", use_container_width=True, help="Revert to standard neutral editorial angle"):
+                st.session_state.pop("workflow_editorial_angle", None)
+                st.session_state.pop("workflow_editorial_focus", None)
+                st.session_state.pop("workflow_article_type", None)
+                st.rerun()
 
     col1, col2 = st.columns([2, 1])
 
@@ -207,10 +213,19 @@ def render_single_workflow_tab():
                 )
                 if chosen_preset_id != "none":
                     match = next((p for p in presets if str(p["id"]) == chosen_preset_id), None)
-                    if match:
+                    if match and st.session_state.get("last_applied_preset_id") != chosen_preset_id:
+                        st.session_state["last_applied_preset_id"] = chosen_preset_id
+                        if match.get("keyword"):
+                            st.session_state["workflow_seed_keyword"] = match["keyword"]
+                        st.session_state["sw_asins_sample"] = match["asins"]
+                        st.toast(f"Loaded preset '{match['name']}'!", icon="📂")
+                        st.rerun()
+                    elif match:
                         saved_default_asins = match["asins"]
                         if match.get("keyword"):
-                            keyword = match["keyword"]
+                            saved_default_kw = match["keyword"]
+                elif st.session_state.get("last_applied_preset_id"):
+                    st.session_state.pop("last_applied_preset_id", None)
 
             asins_input = st.text_area(
                 "Amazon ASINs or Product URLs (One per line)",
@@ -218,7 +233,7 @@ def render_single_workflow_tab():
                 height=130,
                 placeholder="Paste Amazon URLs or ASINs (one per line)...\nExample:\nhttps://www.amazon.com/dp/B08N5WRWNW\nB09V3HN1KC"
             )
-            col_save_asins, col_sample = st.columns([1, 1])
+            col_save_asins, col_sample = st.columns([1, 1], vertical_alignment="center")
             with col_save_asins:
                 if st.button("💾 Save as Default ASINs", use_container_width=True, key="save_asins_btn_sw"):
                     set_setting("LAST_ASINS", asins_input.strip())
@@ -245,7 +260,7 @@ def render_single_workflow_tab():
             # CSV Product Importer (Section 4 & 5 Compliance)
             with st.expander("📂 Import Products from CSV Spreadsheet", expanded=False):
                 st.caption("Upload a CSV file containing your product research (ASIN, Title, Price, Specs, Pros, Cons, URL).")
-                csv_c1, csv_c2 = st.columns([1.5, 1])
+                csv_c1, csv_c2 = st.columns([1.5, 1], vertical_alignment="bottom")
                 with csv_c2:
                     st.download_button(
                         "📥 Download CSV Template",
@@ -275,7 +290,7 @@ def render_single_workflow_tab():
                 height=180,
                 placeholder="Product: Name\nPrice: $XX\nSpecs: ...\nPros: ...\nCons: ...\nLink: https://..."
             )
-            col_save_facts, col_sample_facts = st.columns([1, 1])
+            col_save_facts, col_sample_facts = st.columns([1, 1], vertical_alignment="center")
             with col_save_facts:
                 if st.button("💾 Save as Default Facts", use_container_width=True, key="save_facts_btn_sw"):
                     set_setting("LAST_MANUAL_FACTS", manual_facts_input.strip())
@@ -311,7 +326,13 @@ def render_single_workflow_tab():
             if target_site_obj:
                 st.caption(f"Synced Taxonomies: {len(target_site_obj.categories)} Categories, {len(target_site_obj.tags)} Tags")
         else:
-            st.caption("No WordPress sites connected. Connect one in 'Multi-Site WordPress' tab.")
+            col_ns1, col_ns2 = st.columns([1.8, 1], vertical_alignment="center")
+            with col_ns1:
+                st.caption("No WordPress sites connected yet.")
+            with col_ns2:
+                if st.button("🌐 Connect Site ➔", use_container_width=True, key="sw_no_site_cta"):
+                    st.session_state["target_nav_tab"] = "Multi-Site WP"
+                    st.rerun()
 
         st.markdown("---")
         st.markdown("### ⚙️ Model & Writing Options")
@@ -459,7 +480,7 @@ def render_single_workflow_tab():
 
             if not products:
                 status.update(label="❌ Failed to extract product details.", state="error")
-                st.error("Could not extract products.")
+                st.error("⚠️ Could not extract product details. Please ensure your ASINs are valid 10-character codes (or standard Amazon URLs), or switch to '📝 Manual Product Facts' mode to proceed without live network scraping.")
                 return
 
             st.write(f"✅ Sourced {len(products)} product(s):")
@@ -467,6 +488,7 @@ def render_single_workflow_tab():
                 st.write(f"- **{p.title[:60]}...** ({p.price}) [{p.provenance}]")
 
             st.write(f"✍️ Drafting SEO article with {chosen_provider.upper()} ({selected_model})...")
+            st.session_state["sw_stage"] = 3
             client = get_llm_client(provider=chosen_provider, model=selected_model, api_key=active_key)
 
             try:
@@ -537,14 +559,23 @@ def render_single_workflow_tab():
                 
                 score_val = draft.quality_scorecard.total_score if draft.quality_scorecard else 95
                 
-                col_res1, col_res2 = st.columns([1.6, 1])
+                col_res1, col_res2, col_res3 = st.columns([1.6, 1.1, 0.9], vertical_alignment="center")
                 with col_res1:
                     st.success(f"🎉 Successfully generated draft: **'{draft.title}'** (Quality Score: **{score_val}/100**)")
                 with col_res2:
-                    if st.button("👉 Open in HITL Review Studio ➔", type="primary", use_container_width=True, key="sw_goto_review_btn"):
+                    if st.button("👉 Open in HITL Review ➔", type="primary", use_container_width=True, key="sw_goto_review_btn"):
                         st.toast("Opening Review Studio...", icon="👉")
-                        st.session_state["target_nav_tab"] = "HITL Review Studio"
+                        st.session_state["target_nav_tab"] = "HITL Review"
                         st.session_state["review_selected_draft_id"] = draft.id
+                        st.rerun()
+                with col_res3:
+                    if st.button("🔄 New Article", use_container_width=True, key="sw_start_new_btn"):
+                        st.session_state["sw_stage"] = 1
+                        st.session_state.pop("workflow_seed_keyword", None)
+                        st.session_state.pop("workflow_editorial_angle", None)
+                        st.session_state.pop("workflow_editorial_focus", None)
+                        st.session_state.pop("workflow_article_type", None)
+                        st.toast("Started new article workflow!", icon="🔄")
                         st.rerun()
             except Exception as e:
                 status.update(label=f"❌ Error during generation: {e}", state="error")
