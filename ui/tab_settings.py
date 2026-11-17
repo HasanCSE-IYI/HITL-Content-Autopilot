@@ -32,7 +32,28 @@ def render_settings_tab():
     st.subheader("⚙️ System Configuration & Credentials")
     st.caption("All settings are permanently saved to the local SQLite database and persist across reboots.")
 
-    # 0. Active AI Provider Selector
+    # 0.1 🛡️ Zero-Cost Dry-Run & Credit Protection Mode
+    col_prot1, col_prot2 = st.columns([3, 1.2], vertical_alignment="center")
+    with col_prot1:
+        st.markdown("### 🛡️ Credit Protection & Testing Sandbox")
+        st.caption("When enabled, all article generation and research workflows run locally using offline simulated data. **$0.00 spent & 0 credits consumed.**")
+    with col_prot2:
+        is_dry = getattr(settings, "DRY_RUN_MODE", False)
+        dry_toggle = st.toggle("🛡️ Zero-Cost Dry-Run Mode", value=is_dry, key="settings_dry_run_toggle")
+        if dry_toggle != is_dry:
+            settings.save(dry_run_mode=dry_toggle)
+            if dry_toggle:
+                st.toast("🛡️ Dry-Run Sandbox Active: 0 Credits Used!", icon="🛡️")
+            else:
+                st.toast("🟢 Live Production Mode Active", icon="🟢")
+            st.rerun()
+
+    if getattr(settings, "DRY_RUN_MODE", False):
+        st.info("🛡️ **Dry-Run Sandbox is ACTIVE:** You can test all generation buttons, review editors, and bulk queues completely free. No OpenAI or Gemini credits will be billed. When ready for real publishing, toggle this OFF.")
+
+    st.markdown("---")
+
+    # 0.2 Active AI Provider Selector
     st.markdown("### 🧠 Default AI Engine Provider")
     curr_provider = settings.AI_PROVIDER
     provider_idx = 0 if curr_provider == "openai" else 1

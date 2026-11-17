@@ -33,3 +33,30 @@ def test_settings_persists_image_quality():
     # Unsupported quality falls back or is ignored
     settings.save(image_quality="ultra_high_invalid")
     assert settings.IMAGE_QUALITY in ["low", "medium"]
+
+def test_dry_run_mode_persistence_and_factory():
+    from services.generator.factory import get_llm_client, MockLLMClient
+    
+    # Enable dry-run
+    settings.save(dry_run_mode=True)
+    assert settings.DRY_RUN_MODE is True
+
+    client = get_llm_client()
+    assert isinstance(client, MockLLMClient)
+    assert client.is_configured() is True
+    
+    # Test generation
+    text = client.generate_text("Write article for testing")
+    assert "Affiliate Disclosure" in text
+    assert len(text) > 500
+
+    json_data = client.generate_json("Search intent analysis")
+    assert json_data.get("search_intent") == "commercial"
+
+    img_data = client.generate_image("Modern keyboard")
+    assert img_data.get("success") is True
+    assert "image_url" in img_data
+
+    # Restore dry-run to False
+    settings.save(dry_run_mode=False)
+    assert settings.DRY_RUN_MODE is False

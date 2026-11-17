@@ -26,6 +26,19 @@ def create_article_hero_image(
         clean_q = DEFAULT_IMAGE_QUALITY
 
     prompt = get_editorial_image_prompt(keyword, article_angle)
+
+    # 🛡️ Zero-Cost Dry-Run Mode check
+    if getattr(settings, "DRY_RUN_MODE", False):
+        return {
+            "success": True,
+            "image_url": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=1200&q=80",
+            "local_path": None,
+            "prompt": prompt,
+            "quality": clean_q,
+            "model": "gpt-image-2.5-flare (Dry-Run Simulation)",
+            "message": "🛡️ Dry-Run Simulated Hero Image generated with $0.00 credit usage."
+        }
+
     oai = client or OpenAIClient()
 
     if not oai.is_configured():

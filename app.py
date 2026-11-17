@@ -242,90 +242,194 @@ st.markdown("""
     }
 
     /* =============================================================
-       🍏 Apple Cupertino Glassmorphic Segmented Navigation Bar
+       🍏 Apple Cupertino Glassmorphic Segmented Navigation Bar (Modern Pill System)
+       Supports both Streamlit 1.67+ (React Aria) and BaseWeb fallbacks
        ============================================================= */
-    .stTabs [data-baseweb="tab-list"] {
+
+    /* Tab List Capsule Container */
+    [data-testid="stTabs"] [role="tablist"],
+    .stTabs [role="tablist"],
+    [data-testid="stTabs"] [data-baseweb="tab-list"],
+    .stTabs [data-baseweb="tab-list"],
+    [data-baseweb="tab-list"] {
         display: inline-flex !important;
         align-items: center !important;
         background: var(--apple-surface-secondary) !important;
         backdrop-filter: blur(28px) saturate(180%) !important;
         -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-        padding: 5px !important;
+        padding: 5px 6px !important;
         border-radius: 9999px !important;
         border: 1px solid var(--apple-border) !important;
-        box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 4px 16px rgba(0, 0, 0, 0.04) !important;
-        gap: 4px !important;
+        box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.12), 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+        gap: 6px !important;
         margin-bottom: 24px !important;
         overflow-x: auto !important;
         overflow-y: hidden !important;
         white-space: nowrap !important;
         -webkit-overflow-scrolling: touch !important;
         scrollbar-width: none !important;
-        width: 100% !important;
+        width: fit-content !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
+        position: relative !important;
     }
+    [data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar,
     .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
         display: none !important;
     }
 
-    /* Suppress BaseWeb Default Red/Pink Highlight & Bottom Border */
-    .stTabs [data-baseweb="tab-highlight"],
-    .stTabs [data-baseweb="tab-border"] {
+    /* Suppress native horizontal underline borders and bottom lines */
+    [data-testid="stTabs"] [role="tablist"]::after,
+    .stTabs [role="tablist"]::after,
+    [role="tablist"]::after {
         display: none !important;
+        content: none !important;
+        opacity: 0 !important;
+        height: 0 !important;
+        visibility: hidden !important;
     }
 
-    /* Base Tab Pill */
-    .stTabs [data-baseweb="tab"] {
+    /* Suppress React-Aria Selection Indicator & BaseWeb Highlight Underlines */
+    [data-testid="stTabs"] .react-aria-SelectionIndicator,
+    [data-testid="stTab"] .react-aria-SelectionIndicator,
+    [role="tab"] .react-aria-SelectionIndicator,
+    .react-aria-SelectionIndicator,
+    .stTabs [data-baseweb="tab-highlight"],
+    .stTabs [data-baseweb="tab-border"],
+    [data-baseweb="tab-highlight"],
+    [data-baseweb="tab-border"] {
+        display: none !important;
+        opacity: 0 !important;
+        height: 0 !important;
+        visibility: hidden !important;
+        background: transparent !important;
+        border: none !important;
+    }
+
+    /* Base Tab Pill (Ultra-Modern Apple Cupertino Capsule) */
+    [data-testid="stTab"],
+    [role="tab"],
+    .stTabs [data-baseweb="tab"],
+    [data-baseweb="tab"] {
         height: 42px !important;
+        min-height: 42px !important;
+        line-height: 42px !important;
         border-radius: 9999px !important;
-        padding: 0 18px !important;
+        padding: 0 20px !important;
         font-weight: 600 !important;
         font-size: 0.88rem !important;
         color: var(--apple-ink-secondary) !important;
         background: transparent !important;
-        border: none !important;
+        border: 1px solid transparent !important;
+        outline: none !important;
+        box-shadow: none !important;
         transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
         white-space: nowrap !important;
         flex-shrink: 0 !important;
         letter-spacing: -0.01em !important;
-    }
-    .stTabs [data-baseweb="tab"]:hover {
-        color: var(--apple-ink-primary) !important;
-        background: rgba(125, 125, 125, 0.1) !important;
-        transform: translateY(-1px) !important;
-    }
-    .stTabs [data-baseweb="tab"]:focus-visible {
-        outline: none !important;
-        box-shadow: 0 0 0 3px var(--apple-border-focus) !important;
+        cursor: pointer !important;
+        user-select: none !important;
     }
 
-    /* Active Selected Tab Pill */
-    .stTabs [aria-selected="true"] {
+    /* Tab Hover State */
+    [data-testid="stTab"]:hover,
+    [role="tab"]:hover,
+    .stTabs [data-baseweb="tab"]:hover,
+    [data-testid="stTab"][data-hovered],
+    [role="tab"][data-hovered] {
+        color: var(--apple-ink-primary) !important;
+        background: rgba(125, 125, 125, 0.09) !important;
+        border-radius: 9999px !important;
+        transform: translateY(-1px) !important;
+    }
+
+    /* Suppress Sharp Rectangular Focus Box & Blue Outline */
+    [data-testid="stTab"]:focus,
+    [role="tab"]:focus,
+    [data-testid="stTab"]:focus-visible,
+    [role="tab"]:focus-visible,
+    [data-testid="stTab"][data-focus-visible],
+    [role="tab"][data-focus-visible],
+    .stTabs [data-baseweb="tab"]:focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+        border: 1px solid transparent !important;
+    }
+
+    /* Active Selected Tab Pill (Floating Frosted Capsule) */
+    [data-testid="stTab"][aria-selected="true"],
+    [data-testid="stTab"][data-selected="true"],
+    [data-testid="stTab"][data-selected],
+    [role="tab"][aria-selected="true"],
+    [role="tab"][data-selected="true"],
+    [role="tab"][data-selected],
+    .stTabs [aria-selected="true"],
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
         background: var(--apple-surface-card) !important;
         color: var(--apple-blue) !important;
         font-weight: 700 !important;
-        box-shadow: 0 3px 12px rgba(0, 113, 227, 0.15), 0 1px 3px rgba(0, 0, 0, 0.06) !important;
-        border: 1px solid rgba(0, 113, 227, 0.22) !important;
+        border-radius: 9999px !important;
+        border: 1px solid rgba(0, 113, 227, 0.24) !important;
+        box-shadow: 0 4px 14px rgba(0, 113, 227, 0.16), 0 1px 3px rgba(0, 0, 0, 0.06) !important;
         transform: none !important;
     }
 
+    /* Text Elements Inside Tabs Inherit Styling */
+    [data-testid="stTab"] p,
+    [data-testid="stTab"] span,
+    [data-testid="stTab"] div,
+    [role="tab"] p,
+    [role="tab"] span,
+    [role="tab"] div,
+    .stTabs [data-baseweb="tab"] p,
+    .stTabs [data-baseweb="tab"] span {
+        color: inherit !important;
+        font-size: inherit !important;
+        font-weight: inherit !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Smooth Scroll Nav Controls (Left/Right Arrows) */
+    [data-testid="stTabsScrollLeft"],
+    [data-testid="stTabsScrollRight"] {
+        border-radius: 9999px !important;
+        background: var(--apple-surface-card) !important;
+        border: 1px solid var(--apple-border) !important;
+        box-shadow: var(--apple-shadow-sm) !important;
+        color: var(--apple-ink-primary) !important;
+        transition: all 0.2s var(--apple-ease) !important;
+    }
+    [data-testid="stTabsScrollLeft"]:hover,
+    [data-testid="stTabsScrollRight"]:hover {
+        background: var(--apple-surface-secondary) !important;
+        border-color: var(--apple-blue) !important;
+        color: var(--apple-blue) !important;
+    }
+
     /* Nested In-Page Sub-Tabs (Visual Hierarchy Distinction) */
+    [data-testid="stTabs"] [data-testid="stTabs"] [role="tablist"],
+    .stTabs .stTabs [role="tablist"],
     .stTabs .stTabs [data-baseweb="tab-list"] {
-        border-radius: 12px !important;
+        border-radius: 9999px !important;
         padding: 3px !important;
         background: rgba(125, 125, 125, 0.08) !important;
         margin-bottom: 16px !important;
         box-shadow: none !important;
     }
+    [data-testid="stTabs"] [data-testid="stTabs"] [role="tab"],
+    .stTabs .stTabs [role="tab"],
     .stTabs .stTabs [data-baseweb="tab"] {
         height: 34px !important;
-        border-radius: 9px !important;
+        min-height: 34px !important;
+        line-height: 34px !important;
+        border-radius: 9999px !important;
         padding: 0 14px !important;
         font-size: 0.82rem !important;
     }
+    [data-testid="stTabs"] [data-testid="stTabs"] [aria-selected="true"],
     .stTabs .stTabs [aria-selected="true"] {
-        border-radius: 9px !important;
+        border-radius: 9999px !important;
     }
 
     /* Tactile Button System */
@@ -760,11 +864,17 @@ st.markdown("""
         .bento-value, .status-card-title, .main-header {
             color: var(--apple-ink-primary) !important;
         }
+        [data-testid="stTab"][aria-selected="true"],
+        [data-testid="stTab"][data-selected="true"],
+        [data-testid="stTab"][data-selected],
+        [role="tab"][aria-selected="true"],
+        [role="tab"][data-selected="true"],
+        [role="tab"][data-selected],
         .stTabs [aria-selected="true"] {
             background: #2c2c2e !important;
             color: #2997ff !important;
-            border-color: rgba(41, 151, 255, 0.3) !important;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+            border-color: rgba(41, 151, 255, 0.35) !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(41, 151, 255, 0.2) !important;
         }
     }
 
@@ -1091,11 +1201,14 @@ with col_dock_h2:
         gk = st.text_input("Gemini API Key", value=active_gemini_key, type="password", key="pop_gemini_key", placeholder="AIzaSy...")
         ok = st.text_input("OpenAI API Key", value=active_openai_key, type="password", key="pop_openai_key", placeholder="sk-proj-...")
         prov = st.selectbox("Default Provider", options=["gemini", "openai"], index=0 if active_provider == "gemini" else 1, key="pop_prov_select", format_func=lambda x: "✨ Google Gemini" if x == "gemini" else "🤖 OpenAI")
+        is_dry_now = getattr(settings, "DRY_RUN_MODE", False)
+        dry_chk = st.checkbox("🛡️ Zero-Cost Dry-Run Mode (0 Credits)", value=is_dry_now, key="pop_dry_run_check", help="Simulate AI calls locally with $0.00 cost.")
         if st.button("Save AI Settings", use_container_width=True, type="primary", key="pop_save_btn"):
             settings.save(
                 gemini_api_key=gk.strip() if gk.strip() else None,
                 openai_api_key=ok.strip() if ok.strip() else None,
-                ai_provider=prov
+                ai_provider=prov,
+                dry_run_mode=dry_chk
             )
             if gk.strip():
                 st.session_state["gemini_api_key"] = gk.strip()
@@ -1107,7 +1220,18 @@ with col_dock_h2:
 b1, b2, b3, b4, b5 = st.columns([1.3, 1.3, 1.1, 1.2, 1.1], vertical_alignment="top")
 
 with b1:
-    if active_provider == "openai":
+    if getattr(settings, "DRY_RUN_MODE", False):
+        st.markdown("""
+        <div class="apple-status-card">
+            <div class="status-card-header">
+                <span class="apple-beacon-dot" style="background: var(--apple-blue);"></span>
+                <span class="status-card-label">AI Engine</span>
+            </div>
+            <div class="status-card-title">🛡️ Dry-Run Active</div>
+            <div class="status-card-meta">Zero Credits Used • $0.00</div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif active_provider == "openai":
         is_ok = bool(active_openai_key)
         beacon_color = "var(--apple-green)" if is_ok else "var(--apple-red)"
         st.markdown(f"""

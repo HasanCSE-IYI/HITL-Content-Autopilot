@@ -123,6 +123,10 @@ class Settings:
         except ValueError:
             self.LLM_CACHE_TTL_HOURS = 48
 
+        # Dry-Run / Safe Simulation Mode (Zero Credit Waste)
+        db_dry_run = get_setting("DRY_RUN_MODE", "false")
+        self.DRY_RUN_MODE = db_dry_run.strip().lower() in ("true", "1", "yes") or os.getenv("DRY_RUN_MODE", "false").strip().lower() in ("true", "1", "yes")
+
         self.MAX_TOKENS_KEYWORD = MAX_TOKENS_KEYWORD
         self.MAX_TOKENS_ROUNDUP = MAX_TOKENS_ROUNDUP
         self.MAX_TOKENS_REVIEW = MAX_TOKENS_REVIEW
@@ -187,9 +191,15 @@ class Settings:
         gemini_timeout: int = None,
         openai_timeout: int = None,
         enable_llm_cache: bool = None,
-        llm_cache_ttl_hours: int = None
+        llm_cache_ttl_hours: int = None,
+        dry_run_mode: bool = None
     ):
         from core.database import set_setting
+
+        if dry_run_mode is not None:
+            self.DRY_RUN_MODE = bool(dry_run_mode)
+            os.environ["DRY_RUN_MODE"] = "true" if self.DRY_RUN_MODE else "false"
+            set_setting("DRY_RUN_MODE", "true" if self.DRY_RUN_MODE else "false")
 
         if enable_llm_cache is not None:
             self.ENABLE_LLM_CACHE = bool(enable_llm_cache)
@@ -288,6 +298,7 @@ class Settings:
 
         # Try to write to .env if permissions allow
         content = (
+            f"DRY_RUN_MODE={'true' if self.DRY_RUN_MODE else 'false'}\n"
             f"OPENAI_API_KEY={self.OPENAI_API_KEY}\n"
             f"OPENAI_MODEL={self.OPENAI_MODEL}\n"
             f"IMAGE_MODEL={self.IMAGE_MODEL}\n"
